@@ -1,0 +1,271 @@
+/* ============================================================
+   PinSketch — 全局样式
+   ============================================================ */
+:root {
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --line: #3e3e42;
+  --text: #cccccc;
+  --muted: #858585;
+  --accent: #007acc;
+  --gold: #e5c07b;
+  --wire: #4fc1ff;
+  --danger: #f14c4c;
+  --ok: #89d185;
+  --purple: #c586c0;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+}
+
+/* ---------- Layout ---------- */
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr 292px;
+  grid-template-rows: 48px 1fr 28px;
+}
+
+/* ---------- Title bar ---------- */
+.top {
+  grid-column: 1 / 4;
+  background: #181818;
+  border-bottom: 1px solid #303031;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+.title-drag { display: flex; align-items: center; min-width: 210px; height: 100%; gap: 10px; }
+.title-subtitle { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.top-actions { display: flex; align-items: center; gap: 5px; flex: 1; overflow: hidden; -webkit-app-region: no-drag; }
+.top button, .tool, .property button {
+  border: 1px solid #3e3e42;
+  background: #2d2d30;
+  color: var(--text);
+  border-radius: 3px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.top button:hover, .tool:hover, .property button:hover { background: #3e3e42; }
+.top .active, .tool.active { background: #094771; border-color: #007acc; }
+.logo { font-size: 19px; font-weight: 700; color: #75beff; white-space: nowrap; }
+
+/* ---------- Side panels ---------- */
+.left, .property { background: var(--panel); overflow: auto; padding: 11px; }
+.left { border-right: 1px solid var(--line); }
+.property { border-left: 1px solid var(--line); }
+h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing: .6px; margin: 9px 0 7px; }
+
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tool { font-size: 12px; min-height: 34px; }
+
+.guide, .note { font-size: 12px; line-height: 1.55; color: var(--muted); }
+.guide { margin-top: 15px; border-top: 1px solid #3e3e42; padding-top: 10px; }
+
+/* ---------- Canvas / work area ---------- */
+.work {
+  position: relative;
+  overflow: auto;
+  background: #1e1e1e;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.canvas {
+  width: 3000px;
+  height: 2000px;
+  display: block;
+  background-color: #1e1e1e;
+  background-image: linear-gradient(#2a2d2e 1px, transparent 1px), linear-gradient(90deg, #2a2d2e 1px, transparent 1px);
+  background-size: 20px 20px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---------- Context menu ---------- */
+.context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 180px;
+  padding: 5px;
+  background: #252526;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px #0008;
+}
+.context-menu[hidden] { display: none; }
+.context-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #ccc;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font: 13px inherit;
+}
+.context-menu button:hover { background: #094771; color: #fff; }
+.context-menu hr { border: 0; border-top: 1px solid #3e3e42; margin: 5px 0; }
+
+/* ---------- SVG elements ---------- */
+.wire { stroke: var(--wire); stroke-width: 3; fill: none; pointer-events: stroke; cursor: pointer; }
+.wire.preview { stroke: var(--gold); stroke-dasharray: 6 4; }
+.wire.net { stroke: #e5c07b; stroke-width: 5; }
+.wire.selected { stroke: #fff; stroke-width: 5; }
+.selected { filter: drop-shadow(0 0 4px #e5c07b); }
+.component { cursor: move; }
+.component.net { filter: drop-shadow(0 0 5px #e5c07b); }
+.component .body { fill: #2d2d30; stroke: #75beff; stroke-width: 2; }
+.component .sym { fill: none; stroke: var(--gold); stroke-width: 2.2; }
+.component .line { fill: none; stroke: #9cdcfe; stroke-width: 2; }
+.component text { fill: #d4d4d4; font-size: 13px; pointer-events: none; }
+.component .ref { fill: #75beff; font-size: 12px; }
+.pin { fill: #1e1e1e; stroke: #4fc1ff; stroke-width: 2; cursor: crosshair; }
+.pin:hover { fill: #e5c07b; stroke: #fff; }
+.pintext { font-size: 11px !important; fill: #9cdcfe !important; }
+.labelbox { fill: #264f78; stroke: #75beff; stroke-width: 1.5; }
+.powertext { fill: #9cdcfe !important; font-weight: 700; }
+.junction { fill: #4fc1ff; stroke: #fff; stroke-width: 1.5; cursor: crosshair; }
+.remote-node { fill: #1e1e1e; stroke: var(--purple); stroke-width: 2; cursor: crosshair; }
+.remote-label { fill: var(--purple) !important; font-size: 12px !important; font-weight: 600; }
+.cross { stroke: var(--danger); stroke-width: 2.5; fill: none; }
+
+/* ---------- Property panel ---------- */
+.property label { display: block; color: #b5b5b5; font-size: 12px; margin: 11px 0 3px; }
+.property input, .property textarea {
+  width: 100%;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  color: #d4d4d4;
+  padding: 6px;
+  font: 13px Consolas, "Microsoft YaHei", sans-serif;
+}
+.property textarea { height: 130px; resize: vertical; }
+.property .row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+/* ---------- Status bar ---------- */
+.status {
+  grid-column: 1 / 4;
+  background: #181818;
+  border-top: 1px solid #303031;
+  font-size: 12px;
+  color: #858585;
+  padding: 5px 12px;
+}
+
+/* ---------- Modal dialog ---------- */
+.modal { position: fixed; inset: 0; background: #000a; display: none; align-items: center; justify-content: center; z-index: 10; }
+.dialog {
+  width: min(900px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+  background: #252526;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 15px;
+}
+.dialog h2 { margin: 0 0 10px; color: #75beff; font-size: 17px; }
+.dialog textarea {
+  width: 100%;
+  height: 430px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #3e3e42;
+  padding: 10px;
+  font: 12px Consolas;
+  white-space: pre;
+}
+.dialog .actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
+.dialog button {
+  border: 1px solid #3e3e42;
+  background: #2d2d30;
+  color: #d4d4d4;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* ---------- Misc ---------- */
+.empty { color: var(--muted); line-height: 1.6; }
+.badge { font-size: 10px; color: #9cdcfe; border: 1px solid #3e3e42; border-radius: 9px; padding: 1px 6px; margin-left: 6px; }
+.issue { padding: 8px; border-left: 3px solid var(--gold); margin: 6px 0; background: #2d2d30; cursor: pointer; }
+.issue.error { border-color: var(--danger); }
+.issue.ok { border-color: var(--ok); }
+.pseudo-fullscreen { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 9999; }
+
+/* ---------- Design directory (设计目录) ---------- */
+.project-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.project-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #2d2d30;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.project-card:hover { border-color: #007acc; }
+.project-card .pc-info { flex: 1; min-width: 0; }
+.project-card .pc-name { font-weight: 600; color: #d4d4d4; font-size: 14px; }
+.project-card .pc-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.project-card .pc-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.project-card .pc-actions button {
+  border: 1px solid #3e3e42;
+  background: #1e1e1e;
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.project-card .pc-actions button:hover { background: #3e3e42; }
+.project-card .pc-actions button.danger:hover { background: #5a1d1d; border-color: var(--danger); }
+.project-empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
+.save-form { display: flex; gap: 8px; margin-bottom: 14px; }
+.save-form input {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  color: #d4d4d4;
+  padding: 7px 10px;
+  font: 13px inherit;
+}
+.save-form input:focus { outline: none; border-color: #007acc; }
+.save-form button {
+  border: 1px solid #007acc;
+  background: #094771;
+  color: #fff;
+  padding: 7px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.save-form button:hover { background: #0d5390; }
+.dir-tabs { display: flex; gap: 0; margin-bottom: 4px; border-bottom: 1px solid #3e3e42; }
+.dir-tab {
+  border: 1px solid #3e3e42;
+  border-bottom: none;
+  background: #1e1e1e;
+  color: var(--muted);
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  font-size: 13px;
+}
+.dir-tab.active { background: #252526; color: #75beff; border-color: #555; }

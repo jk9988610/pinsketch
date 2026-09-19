@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PinSketch 0.3</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ==================== 顶部工具栏 ==================== -->
+  <header class="top" id="titlebar">
+    <div class="title-drag">
+      <span class="logo">PinSketch <small>0.3</small></span>
+    </div>
+    <div class="top-actions">
+      <button id="newBtn">新建</button>
+      <button id="undoBtn">↶ 撤销</button>
+      <button id="redoBtn">↷ 重做</button>
+      <button id="saveBtn">保存 .pins.json</button>
+      <button id="loadBtn">打开</button>
+      <button id="libraryBtn">芯片库</button>
+      <button id="directoryBtn">设计目录</button>
+      <button id="exportBtn">导出网表</button>
+      <button id="checkBtn">ERC 检查</button>
+      <button id="alignBtn">对齐</button>
+      <button id="zoomOutBtn">−</button>
+      <button id="zoomResetBtn">100%</button>
+      <button id="zoomInBtn">＋</button>
+      <button id="helpBtn">帮助</button>
+      <span class="badge" id="dirty">已保存</span>
+    </div>
+  </header>
+
+  <!-- ==================== 左侧面板 ==================== -->
+  <aside class="left">
+    <h3>编辑工具</h3>
+    <div class="tools">
+      <button class="tool active" data-tool="select">选择 / 移动 (V)</button>
+      <button class="tool" data-tool="wire">正交导线 (W)</button>
+      <button class="tool" data-tool="label">网络标签 (L)</button>
+      <button class="tool" data-tool="remote">远程连接点 (R)</button>
+      <button class="tool" data-tool="junction">连接点 (J)</button>
+      <button class="tool" data-tool="cross">打 × / NC</button>
+    </div>
+    <h3>放置元件</h3>
+    <div class="tools" id="parts"></div>
+    <div class="guide">
+      <b>0.3 规则</b><br>
+      导线只能连接蓝色引脚或青色连接点。点击空白处不会形成电气连接；请使用"连接点"显式连接导线。<br><br>
+      同名网络标签自动合并。选中引脚、标签或导线可高亮整网。<br><br>
+      导线采用正交走线；使用连接点可将多条导线并接。
+    </div>
+  </aside>
+
+  <!-- ==================== 中央画布 ==================== -->
+  <main class="work" id="work">
+    <svg id="canvas" class="canvas" viewBox="0 0 3000 2000"></svg>
+  </main>
+
+  <!-- ==================== 右侧属性面板 ==================== -->
+  <aside class="property" id="property"></aside>
+
+  <!-- ==================== 底部状态栏 ==================== -->
+  <footer class="status" id="status">Ready · 自动保存已启用。</footer>
+</div>
+
+<!-- ==================== 模态框 ==================== -->
+<div class="modal" id="modal">
+  <div class="dialog">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+    <div class="actions">
+      <button id="copyBtn">复制</button>
+      <button id="downloadBtn">下载</button>
+      <button id="closeBtn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 隐藏文件输入 ==================== -->
+<input id="fileInput" type="file" accept=".json,application/json" hidden>
+
+<!-- ==================== 右键菜单 ==================== -->
+<div class="context-menu" id="contextMenu" hidden></div>
+
+<!-- ==================== 脚本（按依赖顺序加载） ==================== -->
+<script src="js/core.js"></script>
+<script src="js/components.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/render.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/projects.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
