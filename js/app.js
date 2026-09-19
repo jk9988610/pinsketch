@@ -1,6 +1,7 @@
 /* ============================================================
    PinSketch — app.js
    主入口：初始化、事件绑定、拖动/缩放/平移、快捷键
+   蓝图框选工具、文件操作
    ============================================================ */
 
 /* ---------- 全屏切换 ---------- */
@@ -27,14 +28,17 @@ function setZoom(z) {
   document.querySelector('#zoomResetBtn').textContent = Math.round(zoom * 100) + '%';
 }
 
-/* ---------- 工具栏切换 ---------- */
+/* ---------- 工具栏切换 + 光标更新 ---------- */
 function setTool() {
   document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+  // 更新画布光标
+  svg.classList.toggle('blueprint-mode', tool === 'blueprint');
+  svg.classList.toggle('placing-mode', !!pendingBlueprint);
 }
 
 /* ---------- 拖动元件 ---------- */
 function startDrag(e, c) {
-  if (tool !== 'select' || e.target.classList.contains('pin')) return;
+  if (tool !== 'select' || e.target.classList.contains('pin') || pendingBlueprint) return;
   selectComponent(c.id, e);
   snapshot();
   const p = client(e);
@@ -116,6 +120,16 @@ function endPan() {
 function endBox() {
   if (!box) return;
   const r = normRect(box.a, box.b);
+
+  // 蓝图框选模式：捕获蓝图
+  if (tool === 'blueprint') {
+    box = null;
+    window.removeEventListener('mouseup', endBox);
+    finishBlueprintCapture(r);
+    return;
+  }
+
+  // 普通框选模式：选中相交元件
   const ids = state.components.filter((c) => inside(c, r)).map((c) => c.id);
   selected = box.add ? new Set([...selected, ...ids]) : new Set(ids);
   box = null;
@@ -138,9 +152,20 @@ svg.addEventListener('mousemove', (e) => {
 
 /* ---------- 画布事件：鼠标按下（框选） ---------- */
 svg.addEventListener('mousedown', (e) => {
-  if (tool === 'select' && e.target === svg && e.button === 0) {
-    box = { a: rawClient(e), b: rawClient(e), add: e.shiftKey || e.ctrlKey };
+  // 蓝图框选模式：在任何空白处都可开始框选
+  if (tool === 'blueprint' && e.button === 0) {
+    box = { a: rawClient(e), b: rawClient(e), add: false };
     window.addEventListener('mouseup', endBox, { once: true });
+    return;
+  }
+  // 普通框选模式：在空白处左键拖动开始框选
+  // 注意：background rect 的 target 是 svg 或 rect 元素，都算空白
+  if (tool === 'select' && e.button === 0 && !pendingBlueprint) {
+    const isEmpty = e.target === svg || e.target.tagName === 'rect' && e.target.getAttribute('fill') === 'transparent';
+    if (isEmpty) {
+      box = { a: rawClient(e), b: rawClient(e), add: e.shiftKey || e.ctrlKey };
+      window.addEventListener('mouseup', endBox, { once: true });
+    }
   }
 });
 
@@ -161,9 +186,22 @@ svg.addEventListener('dblclick', (e) => {
   }
 });
 
-/* ---------- 画布事件：点击（放置 / 选择） ---------- */
+/* ---------- 画布事件：点击（放置 / 选择 / 蓝图放置） ---------- */
 svg.addEventListener('click', (e) => {
   const p = client(e);
+
+  // 蓝图放置
+  if (pendingBlueprint) {
+    handleBlueprintPlace(p.x, p.y);
+    setTool();
+    return;
+  }
+
+  // 蓝图框选模式下点击空白 = 取消蓝图模式
+  if (tool === 'blueprint' && !box) {
+    // 不做选择操作，等框选
+    return;
+  }
 
   if (tool === 'label') {
     add('label', p.x, p.y);
@@ -187,7 +225,7 @@ svg.addEventListener('click', (e) => {
     add('remote', p.x, p.y);
     tool = 'select';
     setTool();
-  } else if (tool === 'select' && e.target === svg) {
+  } else if (tool === 'select' && (e.target === svg || (e.target.tagName === 'rect' && e.target.getAttribute('fill') === 'transparent'))) {
     selected.clear();
     selectedWire = null;
     render();
@@ -231,6 +269,13 @@ document.addEventListener('contextmenu', (e) => {
     msg('已取消导线');
     return;
   }
+  if (pendingBlueprint) {
+    e.preventDefault();
+    pendingBlueprint = null;
+    setTool();
+    msg('已取消蓝图放置');
+    return;
+  }
   if (!e.target.closest('#canvas,.work,.component,.wire,.junction')) return;
   const isObject = !!e.target.closest('.component,.wire,.junction');
   showMenu(
@@ -242,6 +287,7 @@ document.addEventListener('contextmenu', (e) => {
           '-',
           { id: 'wire', label: '从此处开始导线' },
           { id: 'align', label: '对齐所选元件' },
+          { id: 'blueprint', label: '框选为蓝图  B' },
           '-',
           { id: 'undo', label: '撤销' },
           { id: 'redo', label: '重做' },
@@ -252,8 +298,12 @@ document.addEventListener('contextmenu', (e) => {
           { id: 'wire', label: '正交导线  W' },
           { id: 'junction', label: '放置连接点  J' },
           '-',
-          { id: 'library', label: '打开芯片库' },
-          { id: 'directory', label: '设计目录' },
+          { id: 'blueprint', label: '框选蓝图  B' },
+          { id: 'library', label: '芯片库' },
+          { id: 'blueprints', label: '蓝图库' },
+          { id: 'files', label: '文件库' },
+          { id: 'saveAs', label: '另存为…' },
+          '-',
           { id: 'erc', label: 'ERC 检查' },
         ]
   );
@@ -263,6 +313,7 @@ document.addEventListener('contextmenu', (e) => {
 document.querySelectorAll('[data-tool]').forEach((b) => (b.onclick = () => {
   tool = b.dataset.tool;
   wireStart = null;
+  pendingBlueprint = null;
   setTool();
   msg('当前工具：' + b.textContent);
 }));
@@ -294,17 +345,32 @@ window.addEventListener('keydown', (e) => {
     paste();
   }
   if (!e.ctrlKey && !e.metaKey) {
-    const m = { v: 'select', w: 'wire', l: 'label', j: 'junction', r: 'remote' };
+    const m = { v: 'select', w: 'wire', l: 'label', j: 'junction', r: 'remote', b: 'blueprint' };
     if (m[e.key.toLowerCase()]) {
       tool = m[e.key.toLowerCase()];
       wireStart = null;
+      pendingBlueprint = null;
       setTool();
+      msg(m[e.key.toLowerCase()] === 'blueprint' ? '蓝图框选模式：拖动鼠标框选区域，松开后保存为蓝图。按 Esc 取消。' : '当前工具：' + tool);
     }
   }
-  if (e.key === 'Escape' && wireStart) {
-    wireStart = null;
-    render();
-    msg('已取消导线');
+  // Esc 取消
+  if (e.key === 'Escape') {
+    if (wireStart) {
+      wireStart = null;
+      render();
+      msg('已取消导线');
+    }
+    if (pendingBlueprint) {
+      pendingBlueprint = null;
+      setTool();
+      msg('已取消蓝图放置');
+    }
+    if (tool === 'blueprint') {
+      tool = 'select';
+      setTool();
+      msg('已取消蓝图框选');
+    }
   }
 });
 
@@ -314,8 +380,11 @@ document.querySelector('#newBtn').onclick = () => {
     snapshot();
     state = blank();
     selected.clear();
-    currentProjectName = '';
+    selectedWire = null;
+    currentFileName = '';
     commit();
+    updateStatusbar();
+    saveMemory();
   }
 };
 document.querySelector('#undoBtn').onclick = undo;
@@ -325,8 +394,11 @@ document.querySelector('#zoomInBtn').onclick = () => setZoom(zoom * 1.2);
 document.querySelector('#zoomOutBtn').onclick = () => setZoom(zoom / 1.2);
 document.querySelector('#zoomResetBtn').onclick = () => setZoom(1);
 document.querySelector('#libraryBtn').onclick = openLibrary;
-document.querySelector('#directoryBtn').onclick = openDirectory;
+document.querySelector('#blueprintBtn').onclick = openBlueprintLibrary;
+document.querySelector('#captureBpBtn').onclick = enterBlueprintMode;
+document.querySelector('#fileBtn').onclick = openFileLibrary;
 document.querySelector('#saveBtn').onclick = save;
+document.querySelector('#saveAsBtn').onclick = saveAs;
 document.querySelector('#loadBtn').onclick = () => document.querySelector('#fileInput').click();
 document.querySelector('#fileInput').onchange = (e) => loadFile(e.target.files[0]);
 
@@ -401,13 +473,36 @@ requestAnimationFrame(() => {
   }
 });
 
-// 初始化 IndexedDB
-initDB();
+// 初始化 IndexedDB，并尝试恢复当前文件
+initDB().then(async () => {
+  // 从 IndexedDB 加载芯片库
+  try { await loadChipLibraryFromDB(); } catch {}
+  // 如果有当前文件名，尝试从 IndexedDB 恢复
+  if (currentFileName) {
+    try {
+      const f = await dbAction('files', 'readonly', { type: 'get', key: currentFileName });
+      if (f) {
+        // 如果本地自动保存与文件库中的一致，则无需恢复；否则提示
+        msg('当前文件：' + currentFileName + ' · 已自动保存');
+      } else {
+        // 文件已不在文件库中
+        currentFileName = '';
+      }
+    } catch {}
+  }
+  if (!currentFileName) {
+    updateStatusbar();
+  }
+}).catch(() => {
+  // IndexedDB 不可用，继续使用 localStorage
+  updateStatusbar();
+});
 
 // 首次渲染
+setTool();
 showProps();
 render();
-msg('Ready · 自动保存已启用。');
+if (!currentFileName) updateStatusbar();
 
 /* ---------- 导出到全局命名空间 ---------- */
 Object.assign(PinSketch, {

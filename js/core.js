@@ -37,6 +37,7 @@ const DEFS = {
 let state,                    // 当前工程数据 {version, components, wires, nextId}
   tool = 'select',            // 当前工具
   selected = new Set(),       // 选中元件 id
+  selectedPin = null,         // 选中的具体引脚 {cid, pi}，用于高亮该引脚所属网络
   selectedWire = null,        // 选中导线 id
   wireStart = null,           // 导线起点
   drag = null,                // 拖动状态
@@ -249,11 +250,22 @@ function activeNetwork() {
     const w = state.wires.find((x) => x.id === selectedWire);
     return w ? g.find(key(w.a)) : null;
   }
+  if (selectedPin) {
+    const c = byId(selectedPin.cid);
+    if (c?.pins[selectedPin.pi]) return g.find('p' + c.id + '.' + selectedPin.pi);
+  }
   const id = [...selected][0];
   const c = byId(id);
   if (c?.pins.length) return g.find('p' + c.id + '.0');
   if (c?.type === 'junction') return g.find('j' + c.id);
   return null;
+}
+
+/** 统计同名远程连接点数量（不含自身） */
+function remoteMates(c) {
+  if (!c || c.type !== 'remote' || !c.name.trim()) return [];
+  const n = c.name.trim();
+  return state.components.filter((x) => x.type === 'remote' && x.id !== c.id && x.name.trim() === n);
 }
 
 /* ---------- Undo / Redo ---------- */
@@ -298,6 +310,7 @@ function undo() {
   future.push(JSON.stringify(state));
   state = JSON.parse(history.pop());
   selected.clear();
+  selectedPin = null;
   selectedWire = null;
   mark(isDirty());
   commit();
@@ -309,6 +322,7 @@ function redo() {
   history.push(JSON.stringify(state));
   state = JSON.parse(future.pop());
   selected.clear();
+  selectedPin = null;
   selectedWire = null;
   mark(isDirty());
   commit();
@@ -326,6 +340,8 @@ Object.assign(PinSketch, {
   set tool(v) { tool = v; },
   get selected() { return selected; },
   set selected(v) { selected = v; },
+  get selectedPin() { return selectedPin; },
+  set selectedPin(v) { selectedPin = v; },
   get selectedWire() { return selectedWire; },
   set selectedWire(v) { selectedWire = v; },
   get wireStart() { return wireStart; },
@@ -355,7 +371,7 @@ Object.assign(PinSketch, {
   // 函数
   el, snap, uid, byId, msg, esc, blank, migrate,
   wh, pinPos, key, pos, client, rawClient, visibleCenter,
-  graph, orth, route, path, activeNetwork,
+  graph, orth, route, path, activeNetwork, remoteMates,
   snapshot, commit, mark, isDirty, undo, redo, updateStatusbar,
   // DOM
   svg, work, prop, status, titlebar,

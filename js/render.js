@@ -9,6 +9,9 @@ function render() {
   const g = graph();
   const active = activeNetwork();
 
+  // 渲染透明背景矩形，确保 SVG 空白区域可接收鼠标事件
+  svg.append(el('rect', { x: 0, y: 0, width: 3000, height: 2000, fill: 'transparent', 'pointer-events': 'all' }));
+
   // 渲染导线
   state.wires.forEach((w) => {
     const net = g.find(key(w.a));
@@ -35,21 +38,30 @@ function render() {
   // 渲染元件
   state.components.forEach((c) => drawComponent(c, g, active));
 
-  // 渲染框选矩形
+  // 渲染框选矩形（蓝图框选模式用不同颜色）
   if (box) {
     const r = normRect(box.a, box.b);
+    const isBlueprint = tool === 'blueprint';
+    const fillColor = isBlueprint ? '#e5c07b33' : '#54c7ff22';
+    const strokeColor = isBlueprint ? '#e5c07b' : '#54c7ff';
     svg.append(
       el('rect', {
         x: r.x,
         y: r.y,
         width: r.w,
         height: r.h,
-        fill: '#54c7ff22',
-        stroke: '#54c7ff',
-        'stroke-dasharray': '5 4',
+        fill: fillColor,
+        stroke: strokeColor,
+        'stroke-dasharray': isBlueprint ? '8 4' : '5 4',
         'pointer-events': 'none',
       })
     );
+    // 蓝图模式：在框选矩形上方显示文字提示
+    if (isBlueprint) {
+      const t = el('text', { x: r.x + 10, y: r.y - 8 > 0 ? r.y - 8 : r.y + r.h + 18, class: 'bp-label', 'pointer-events': 'none' });
+      t.textContent = '📐 框选蓝图区域…';
+      svg.append(t);
+    }
   }
 }
 

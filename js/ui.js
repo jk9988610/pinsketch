@@ -144,6 +144,7 @@ function openLibrary() {
   document.querySelectorAll('[data-remove]').forEach((b) => (b.onclick = () => {
     chipLibrary = chipLibrary.filter((x) => x.id !== b.dataset.remove);
     saveMemory();
+    deleteChipFromDB(b.dataset.remove).catch(() => {});
     openLibrary();
   }));
 }
@@ -173,7 +174,9 @@ function showMenu(e, items) {
       redo,
       align: alignMenu,
       library: openLibrary,
-      directory: openDirectory,
+      blueprints: openBlueprintLibrary,
+      files: openFileLibrary,
+      saveAs,
       wire: () => {
         tool = 'wire';
         setTool();
@@ -183,9 +186,127 @@ function showMenu(e, items) {
         tool = 'junction';
         setTool();
       },
+      blueprint: enterBlueprintMode,
       erc: () => document.querySelector('#checkBtn').click(),
     })[b.dataset.action]?.();
   }));
+}
+
+/* ---------- 文件库（IndexedDB） ---------- */
+async function openFileLibrary() {
+  let files = [];
+  try {
+    files = await listFiles();
+  } catch {
+    msg('无法访问文件库（浏览器不支持 IndexedDB）。');
+    return;
+  }
+
+  const listHTML = files.length
+    ? files
+        .map(
+          (f) => `
+      <div class="project-card" data-file-name="${esc(f.name)}">
+        <div class="pc-info">
+          <div class="pc-name">📄 ${esc(f.name)}</div>
+          <div class="pc-meta">${f.componentCount} 元件 · ${f.wireCount} 导线 · ${new Date(f.updatedAt || f.createdAt).toLocaleString()}</div>
+        </div>
+        <div class="pc-actions">
+          <button data-file-open="${esc(f.name)}">打开</button>
+          <button data-file-rename="${esc(f.name)}">重命名</button>
+          <button data-file-delete="${esc(f.name)}" class="danger">删除</button>
+        </div>
+      </div>`
+        )
+        .join('')
+    : '<div class="project-empty">文件库为空。<br>在顶部"另存为"将当前工程保存到文件库。</div>';
+
+  const body = `
+    <div class="save-form">
+      <input id="fileNameInput" placeholder="文件名称，如：传感器主板 v1.0" value="${esc(currentFileName)}">
+      <button id="saveFileBtn">另存为</button>
+    </div>
+    <div class="project-grid">${listHTML}</div>
+  `;
+
+  modal('文件库', body);
+
+  // 另存为按钮
+  const saveBtn = document.querySelector('#saveFileBtn');
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const name = document.querySelector('#fileNameInput').value.trim();
+      if (!name) {
+        msg('请输入文件名称。');
+        return;
+      }
+      saveBtn.disabled = true;
+      saveBtn.textContent = '保存中…';
+      try {
+        await saveFileAs(name);
+        msg('已另存为"' + name + '"');
+        openFileLibrary();
+      } catch {
+        msg('保存失败，请重试。');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '另存为';
+      }
+    };
+  }
+
+  // 打开按钮
+  document.querySelectorAll('[data-file-open]').forEach((b) => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const name = b.dataset.fileOpen;
+      document.querySelector('#modal').style.display = 'none';
+      await loadFileByName(name);
+    };
+  });
+
+  // 重命名按钮
+  document.querySelectorAll('[data-file-rename]').forEach((b) => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const oldName = b.dataset.fileRename;
+      const newName = prompt('重命名文件：', oldName);
+      if (!newName?.trim() || newName.trim() === oldName) return;
+      try {
+        await renameFile(oldName, newName.trim());
+        if (currentFileName === oldName) currentFileName = newName.trim();
+        msg('已重命名为"' + newName.trim() + '"');
+        openFileLibrary();
+      } catch {
+        msg('重命名失败。');
+      }
+    };
+  });
+
+  // 删除按钮
+  document.querySelectorAll('[data-file-delete]').forEach((b) => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const name = b.dataset.fileDelete;
+      if (!confirm('确认删除文件"' + name + '"？此操作不可撤销。')) return;
+      try {
+        await deleteFile(name);
+        msg('已删除文件"' + name + '"');
+        openFileLibrary();
+      } catch {
+        msg('删除失败。');
+      }
+    };
+  });
+
+  // 卡片点击 = 打开
+  document.querySelectorAll('.project-card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const name = card.dataset.fileName;
+      document.querySelector('#modal').style.display = 'none';
+      loadFileByName(name);
+    });
+  });
 }
 
 /* ---------- 帮助中心 ---------- */
@@ -199,7 +320,7 @@ function showHelp() {
         <li><b>填写属性与引脚</b>：选中元件，在右侧填写位号、型号、数值；芯片和连接器可编辑引脚名称与所在方向。</li>
         <li><b>组织网络</b>：按 <b>W</b> 选择导线，连接两个蓝色引脚或青色连接点；跨区域信号使用网络标签命名。</li>
         <li><b>检查连通性</b>：点击"ERC 检查"，处理悬空引脚、重复位号、标签冲突和器件两端短接。</li>
-        <li><b>整理与交付</b>：框选相关元件后对齐；保存 <code>.pins.json</code> 归档，导出网表提供给评审、文档或 AI 分析。</li>
+        <li><b>保存文件</b>：点击"另存为"将工程保存到文件库，或下载 <code>.pins.json</code> 归档。导出网表提供给评审、文档或 AI 分析。</li>
       </ol>
       <h3>2. 左侧工具说明</h3>
       <ul>
@@ -209,7 +330,20 @@ function showHelp() {
         <li><b>连接点（J）</b>：在需要三路及以上汇接的位置放置。多条导线都接到同一个连接点，才形成电气并接。</li>
         <li><b>打 × / NC</b>：标注未使用、NC 或 DNP；它只用于说明，不参与网络连通。</li>
       </ul>
-      <h3>3. 编辑、视图与导线</h3>
+      <h3>3. 蓝图库</h3>
+      <ul>
+        <li><b>框选蓝图（B）</b>：点击顶部"框选蓝图"按钮或在蓝图库中点击"框选蓝图"，鼠标变为十字光标。拖动鼠标框选区域，松开后输入名称保存为蓝图。</li>
+        <li><b>放置蓝图</b>：在蓝图库中点击卡片或"放置"按钮，然后在画布上点击放置位置。蓝图中的元件和内部导线会被整体复制，ID 自动重新分配。</li>
+        <li><b>管理蓝图</b>：在蓝图库中可重命名和删除蓝图。蓝图保存在浏览器 IndexedDB 中，按更新时间排序。</li>
+      </ul>
+      <h3>4. 文件库与保存</h3>
+      <ul>
+        <li><b>另存为</b>：将当前工程以指定名称保存到文件库（IndexedDB），可随时重新打开。顶部"另存为"按钮或右键菜单可访问。</li>
+        <li><b>文件库</b>：在文件库中管理所有已保存文件，支持打开、重命名和删除。</li>
+        <li><b>保存（Ctrl+S）</b>：下载 <code>.pins.json</code> 文件到本地磁盘，作为归档备份。</li>
+        <li><b>打开</b>：从本地磁盘打开 <code>.pins.json</code> 文件，或从文件库打开已保存文件。</li>
+      </ul>
+      <h3>5. 编辑、视图与导线</h3>
       <ul>
         <li><b>复制粘贴</b>：<code>Ctrl/Cmd + C</code>、<code>Ctrl/Cmd + V</code>。仅复制元件，不复制导线，防止意外跨网络连接。</li>
         <li><b>对齐</b>：多选至少两个元件后，点击顶部"对齐"左对齐；右侧面板还可横向等距。</li>
@@ -217,37 +351,29 @@ function showHelp() {
         <li><b>导线拐点</b>：双击既有导线增加拐点；选中该线后拖动黄色方块调整路径。删除导线可重新布线。</li>
         <li><b>撤销与保存</b>：<code>Ctrl/Cmd + Z</code> 撤销，<code>Ctrl/Cmd + Y</code> 重做，<code>Ctrl/Cmd + S</code> 下载工程。浏览器同时会自动保存恢复副本。</li>
       </ul>
-      <h3>4. 设计目录</h3>
-      <ul>
-        <li><b>保存到目录</b>：点击顶部"设计目录"按钮，输入名称后将当前设计保存到浏览器本地数据库（IndexedDB）。</li>
-        <li><b>打开设计</b>：在设计目录对话框中点击卡片或"打开"按钮即可加载历史设计。</li>
-        <li><b>管理</b>：支持重命名和删除；设计按更新时间排序。设计目录与 <code>.pins.json</code> 下载文件独立存储，可互为备份。</li>
-      </ul>
-      <h3>5. 术语解释</h3>
+      <h3>6. 术语解释</h3>
       <ul>
         <li><b>元件（Component）</b>：芯片、电阻、电容、连接器等硬件对象。</li>
         <li><b>位号（Reference）</b>：元件唯一编号，如 <code>U1</code>、<code>R3</code>、<code>J1</code>。</li>
         <li><b>引脚（Pin）</b>：元件的电气连接端，例如 MCU 的 <code>SDA</code> 或电阻的 1、2 脚。</li>
         <li><b>网络（Net）</b>：电气上互相连通的一组引脚，例如 <code>GND</code>、<code>SPI_MOSI</code>。</li>
-        <li><b>网络标签（Net Label）</b>：网络的名称；相同名称即使没有画长导线，也视为同一网络。</li>
-        <li><b>连接点（Junction）</b>：明确声明导线汇接的节点；仅视觉交叉不等于连接。</li>
-        <li><b>ERC</b>：Electrical Rules Check，电气规则检查，用于发现基础连通错误。</li>
-        <li><b>网表（Netlist）</b>：按网络列出各元件引脚连接关系的文本，适合核对和交付。</li>
+        <li><b>蓝图（Blueprint）</b>：框选区域内的元件和导线的快照，可整体保存并重复放置到画布。</li>
+        <li><b>文件（File）</b>：整个工程的完整保存，包括所有元件、导线和元数据。</li>
       </ul>
-      <h3>6. 界面模块作用</h3>
+      <h3>7. 界面模块作用</h3>
       <ul>
-        <li><b>顶部工具栏</b>：新建、撤销/重做、保存/打开、设计目录、网表导出、ERC、批量对齐和视图缩放。</li>
+        <li><b>顶部工具栏</b>：新建、撤销/重做、保存/另存为/文件库、蓝图库、网表导出、ERC、批量对齐和视图缩放。</li>
         <li><b>左侧面板</b>：选择编辑工具并放置元件。</li>
         <li><b>中央画布</b>：绘制和组织引脚—网络关系图。</li>
         <li><b>右侧属性面板</b>：编辑选中对象的位号、型号、数值、引脚；进行多选对齐操作。</li>
-        <li><b>底部状态栏</b>：显示当前操作提示及自动保存状态。</li>
+        <li><b>底部状态栏</b>：显示当前操作提示、当前文件名及自动保存状态。</li>
       </ul>
-      <p><b>注意：</b>PinSketch 用于记录和检查引脚—网络关系，不替代完整 PCB EDA。重要项目请始终下载 JSON 工程文件归档。</p>
+      <p><b>注意：</b>PinSketch 用于记录和检查引脚—网络关系，不替代完整 PCB EDA。文件库和蓝图库使用 IndexedDB 存储，清除浏览器数据会一并删除。</p>
     </div>`
   );
 }
 
 /* ---------- 导出到全局命名空间 ---------- */
 Object.assign(PinSketch, {
-  modal, showProps, openLibrary, contextMenu, hideMenu, showMenu, showHelp,
+  modal, showProps, openLibrary, openFileLibrary, contextMenu, hideMenu, showMenu, showHelp,
 });

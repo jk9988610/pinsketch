@@ -87,6 +87,7 @@ function saveChipToLibrary(c) {
   };
   chipLibrary.push(item);
   saveMemory();
+  saveChipToDB(item).catch(() => {}); // 异步同步到 IndexedDB
   msg('已保存"' + item.name + '"到芯片库');
 }
 
