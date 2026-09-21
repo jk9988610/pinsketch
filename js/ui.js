@@ -22,10 +22,10 @@ function showProps() {
   // 多选
   if (selected.size > 1) {
     prop.innerHTML = `<h3>已选择 ${selected.size} 个元件</h3>
-      <p class="note">可拖动、复制、删除，或使用顶部"对齐"按钮。</p>
-      <button id="align">左对齐</button> <button id="dist">横向等距</button>`;
-    document.querySelector('#align').onclick = alignLeft;
-    document.querySelector('#dist').onclick = distribute;
+      <p class="note">可拖动、复制、删除。按 Ctrl+C 复制，Ctrl+V 粘贴。按 R 旋转。</p>
+      <div style="margin-top:8px;display:flex;gap:7px"><button id="rotate">旋转 R</button><button id="del">删除选中</button></div>`;
+    document.querySelector('#del').onclick = deleteSelected;
+    document.querySelector('#rotate').onclick = rotateSelected;
     return;
   }
 
@@ -46,7 +46,7 @@ function showProps() {
   // 空白
   if (!c) {
     prop.innerHTML =
-      '<div class="empty">拖曳画布空白处可框选。Shift+点击可增减选择。<br><br>双击导线新增拐点；滚轮缩放，按住中键或空格拖动可平移画布。</div>';
+      '<div class="empty">拖曳画布空白处可框选。Shift+点击可增减选择。<br><br>选中导线后可拖动整条导线；双击导线新增拐点。<br><br>Ctrl+滚轮以鼠标为中心缩放，Shift+滚轮横向滚动，中键拖动平移画布。</div>';
     return;
   }
 
@@ -68,10 +68,14 @@ function showProps() {
 
   // 远程连接点
   if (c.type === 'remote') {
+    const mates = remoteMates(c);
+    const mateText = mates.length
+      ? '已与 ' + mates.length + ' 个同名远程点隐藏连通：' + mates.map((x) => x.name).join(', ')
+      : '当前还没有其他同名远程点。在另一处再放一个相同名称的远程点即可隐藏连接。';
     prop.innerHTML = `<h3>远程连接点</h3>
       <label>网络名称</label>
       <input id="remoteName" value="${esc(c.name)}">
-      <p class="note">同名远程连接点会自动形成隐藏连接。请用一小段导线将本点连到器件引脚或连接点；隐藏连接不会在画布上绘制。</p>
+      <p class="note">${esc(mateText)}<br><br>用法：用一小段导线把紫色端点接到芯片/按键引脚，再在另一张图同样命名。画布上不画跨区域长线，但 ERC 与网表会把两端视为同一网络。</p>
       <div style="margin-top:12px;display:flex;gap:7px"><button id="applyRemote">应用</button><button id="del">删除</button></div>`;
     document.querySelector('#applyRemote').onclick = () => {
       const n = document.querySelector('#remoteName').value.trim();
@@ -88,7 +92,7 @@ function showProps() {
   }
 
   // 普通元件
-  const editable = ['chip', 'connector'].includes(c.type);
+  const editable = c.type === 'chip';
   const sizeFields = editable
     ? `<div class="row"><div><label>宽度</label><input id="width" type="number" min="100" step="10" value="${Number(c.width) || 180}"></div><div><label>高度</label><input id="height" type="number" min="80" step="10" value="${Number(c.height) || 140}"></div></div>`
     : '';
@@ -101,14 +105,14 @@ function showProps() {
     <label>数值 / 备注</label>
     <input id="value" value="${esc(c.value)}">
     ${editable ? `<label>引脚定义</label><textarea id="pins">${esc(c.pins.map((p) => p.side + ': ' + p.name).join('\n'))}</textarea><p class="note">修改引脚会删除此器件的既有导线。</p>` : ''}
-    <div style="margin-top:12px;display:flex;gap:7px"><button id="apply">应用</button>${editable ? '<button id="saveLib">保存到芯片库</button>' : ''}<button id="del">删除</button></div>`;
+    <div style="margin-top:12px;display:flex;gap:7px"><button id="apply">应用</button><button id="rotate">旋转 R</button>${editable ? '<button id="saveLib">保存到芯片库</button>' : ''}<button id="del">删除</button></div>`;
 
   document.querySelector('#apply').onclick = () => {
     snapshot();
     c.ref = document.querySelector('#ref').value.trim();
     c.name = document.querySelector('#name').value.trim() || DEFS[c.type];
     c.value = document.querySelector('#value').value.trim();
-    if (['chip', 'connector'].includes(c.type)) {
+    if (c.type === 'chip') {
       c.width = Math.max(100, Number(document.querySelector('#width').value) || 180);
       c.height = Math.max(80, Number(document.querySelector('#height').value) || 140);
     }
@@ -123,6 +127,7 @@ function showProps() {
     commit();
   };
   document.querySelector('#del').onclick = deleteSelected;
+  document.querySelector('#rotate').onclick = rotateSelected;
   if (editable)
     document.querySelector('#saveLib').onclick = () => saveChipToLibrary(c);
 }
@@ -172,7 +177,6 @@ function showMenu(e, items) {
       delete: deleteSelected,
       undo,
       redo,
-      align: alignMenu,
       library: openLibrary,
       blueprints: openBlueprintLibrary,
       files: openFileLibrary,
@@ -185,6 +189,11 @@ function showMenu(e, items) {
       junction: () => {
         tool = 'junction';
         setTool();
+      },
+      remote: () => {
+        tool = 'remote';
+        setTool();
+        msg('远程连接点：点击画布放置，再填写网络名称');
       },
       blueprint: enterBlueprintMode,
       erc: () => document.querySelector('#checkBtn').click(),
@@ -318,17 +327,26 @@ function showHelp() {
       <ol>
         <li><b>放置元件</b>：从左侧选择芯片、连接器或基础器件，在画布中建立需要表达的硬件对象。</li>
         <li><b>填写属性与引脚</b>：选中元件，在右侧填写位号、型号、数值；芯片和连接器可编辑引脚名称与所在方向。</li>
-        <li><b>组织网络</b>：按 <b>W</b> 选择导线，连接两个蓝色引脚或青色连接点；跨区域信号使用网络标签命名。</li>
+        <li><b>组织网络</b>：按 <b>W</b> 选择导线，连接两个蓝色引脚、青色连接点或紫色远程点。跨区域信号可用网络标签，或用远程连接点（<b>R</b>）同名隐藏连通。</li>
         <li><b>检查连通性</b>：点击"ERC 检查"，处理悬空引脚、重复位号、标签冲突和器件两端短接。</li>
         <li><b>保存文件</b>：点击"另存为"将工程保存到文件库，或下载 <code>.pins.json</code> 归档。导出网表提供给评审、文档或 AI 分析。</li>
       </ol>
       <h3>2. 左侧工具说明</h3>
       <ul>
-        <li><b>选择 / 移动（V）</b>：单击选择元件；<code>Shift + 单击</code> 增减多选；拖动元件移动；拖动画布空白区域可框选。</li>
-        <li><b>正交导线（W）</b>：先点起点、再点终点。终点必须是蓝色引脚或青色连接点。线条交叉默认不连通。</li>
+        <li><b>选择 / 移动（V）</b>：单击选择元件；<code>Shift + 单击</code> 增减多选；拖动元件移动；拖动画布空白区域可框选。多选后拖动可整体移动。</li>
+        <li><b>正交导线（W）</b>：先点起点、再点终点。终点必须是蓝色引脚、青色连接点或紫色远程点。线条交叉默认不连通。选中导线后可直接拖动整条导线位移。</li>
         <li><b>网络标签（L）</b>：在画布空白处放置标签，右侧修改名称，如 <code>SDA</code>、<code>3V3</code>。同名标签自动代表同一网络。</li>
-        <li><b>连接点（J）</b>：在需要三路及以上汇接的位置放置。多条导线都接到同一个连接点，才形成电气并接。</li>
+        <li><b>远程连接点（M）</b>：放置后填写网络名，如 <code>KEY_L</code>。把短线接到器件引脚；另一处同样命名即可隐藏连通，画布上不画长线。</li>
+        <li><b>连接点（J）</b>：在需要三路及以上汇接的位置放置。多条导线都接到同一个连接点，才形成电气并接。连接点可以像元件一样选中并拖动移动。</li>
         <li><b>打 × / NC</b>：标注未使用、NC 或 DNP；它只用于说明，不参与网络连通。</li>
+        <li><b>旋转（R）</b>：选中元件后按 <code>R</code> 键顺时针旋转 90°。可多次旋转。引脚位置和标签方向自动跟随旋转。</li>
+      </ul>
+      <h3>3. 电气连接规则</h3>
+      <ul>
+        <li>导线只能连接蓝色引脚、青色连接点或紫色远程点。点击空白处不会形成电气连接；请使用"连接点"显式连接导线。</li>
+        <li>同名网络标签、同名远程连接点自动合并为隐藏网络。选中引脚、标签、远程点或导线可高亮整网。</li>
+        <li>导线采用正交走线；使用连接点可将多条导线并接。跨区域信号用远程连接点命名，不必画长线。</li>
+        <li>仅视觉上交叉的导线<b>不会</b>自动连通，必须通过连接点（J）显式汇接。</li>
       </ul>
       <h3>3. 蓝图库</h3>
       <ul>
@@ -345,10 +363,10 @@ function showHelp() {
       </ul>
       <h3>5. 编辑、视图与导线</h3>
       <ul>
-        <li><b>复制粘贴</b>：<code>Ctrl/Cmd + C</code>、<code>Ctrl/Cmd + V</code>。仅复制元件，不复制导线，防止意外跨网络连接。</li>
-        <li><b>对齐</b>：多选至少两个元件后，点击顶部"对齐"左对齐；右侧面板还可横向等距。</li>
-        <li><b>缩放和平移</b>：<code>Ctrl + 滚轮</code> 缩放；中键拖动或 <code>Shift + 左键拖动</code> 平移；顶部按钮可调整或重置为 100%。</li>
-        <li><b>导线拐点</b>：双击既有导线增加拐点；选中该线后拖动黄色方块调整路径。删除导线可重新布线。</li>
+        <li><b>复制粘贴</b>：<code>Ctrl/Cmd + C</code>、<code>Ctrl/Cmd + V</code>。复制元件和内部导线（两端都在选中集合内的导线）。粘贴时跟随鼠标位置放置。</li>
+        <li><b>多选操作</b>：框选多个元件后可批量拖动、复制、删除。右侧属性面板提供删除选中按钮。</li>
+        <li><b>缩放和平移</b>：<code>Ctrl + 滚轮</code> 以鼠标位置为中心缩放；<code>Shift + 滚轮</code> 横向滚动；普通滚轮纵向滚动；中键拖动或 <code>Shift + 左键拖动</code> 平移画布。</li>
+        <li><b>导线操作</b>：单击导线选中后可直接拖动整条导线位移；双击导线增加拐点；选中后拖动黄色方块调整单个拐点位置。删除导线可重新布线。</li>
         <li><b>撤销与保存</b>：<code>Ctrl/Cmd + Z</code> 撤销，<code>Ctrl/Cmd + Y</code> 重做，<code>Ctrl/Cmd + S</code> 下载工程。浏览器同时会自动保存恢复副本。</li>
       </ul>
       <h3>6. 术语解释</h3>
@@ -357,15 +375,16 @@ function showHelp() {
         <li><b>位号（Reference）</b>：元件唯一编号，如 <code>U1</code>、<code>R3</code>、<code>J1</code>。</li>
         <li><b>引脚（Pin）</b>：元件的电气连接端，例如 MCU 的 <code>SDA</code> 或电阻的 1、2 脚。</li>
         <li><b>网络（Net）</b>：电气上互相连通的一组引脚，例如 <code>GND</code>、<code>SPI_MOSI</code>。</li>
+        <li><b>远程连接点（Remote）</b>：可命名的隐藏网络端点。同名远程点视为同一网络，适合 KEY_L、USB_P 这类跨区域信号。</li>
         <li><b>蓝图（Blueprint）</b>：框选区域内的元件和导线的快照，可整体保存并重复放置到画布。</li>
         <li><b>文件（File）</b>：整个工程的完整保存，包括所有元件、导线和元数据。</li>
       </ul>
       <h3>7. 界面模块作用</h3>
       <ul>
-        <li><b>顶部工具栏</b>：新建、撤销/重做、保存/另存为/文件库、蓝图库、网表导出、ERC、批量对齐和视图缩放。</li>
+        <li><b>顶部工具栏</b>：新建、撤销/重做、保存/另存为/文件库、蓝图库、网表导出、ERC 和视图缩放。</li>
         <li><b>左侧面板</b>：选择编辑工具并放置元件。</li>
         <li><b>中央画布</b>：绘制和组织引脚—网络关系图。</li>
-        <li><b>右侧属性面板</b>：编辑选中对象的位号、型号、数值、引脚；进行多选对齐操作。</li>
+        <li><b>右侧属性面板</b>：编辑选中对象的位号、型号、数值、引脚；多选时提供删除按钮。</li>
         <li><b>底部状态栏</b>：显示当前操作提示、当前文件名及自动保存状态。</li>
       </ul>
       <p><b>注意：</b>PinSketch 用于记录和检查引脚—网络关系，不替代完整 PCB EDA。文件库和蓝图库使用 IndexedDB 存储，清除浏览器数据会一并删除。</p>

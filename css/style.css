@@ -126,25 +126,47 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
 .wire.net { stroke: #e5c07b; stroke-width: 5; }
 .wire.selected { stroke: #fff; stroke-width: 5; }
 .selected { filter: drop-shadow(0 0 4px #e5c07b); }
-.component { cursor: move; }
+.component { cursor: default; }
 .component.net { filter: drop-shadow(0 0 5px #e5c07b); }
+/* select 模式下元件可拖动 — 自定义十字+箭头光标 */
+.canvas.tool-select .component {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg stroke='%23cccccc' stroke-width='1.5' fill='none'%3E%3Cpath d='M16 4V28 M4 16H28'/%3E%3C/g%3E%3Cg fill='%23cccccc'%3E%3Cpath d='M16 2 L13 7 L19 7 Z'/%3E%3Cpath d='M16 30 L13 25 L19 25 Z'/%3E%3Cpath d='M2 16 L7 13 L7 19 Z'/%3E%3Cpath d='M30 16 L25 13 L25 19 Z'/%3E%3C/g%3E%3C/svg%3E") 16 16, grab;
+}
+.canvas.tool-select.dragging .component { cursor: grabbing; }
+.canvas.tool-select .junction { cursor: grab; }
+.canvas.tool-select .wire { cursor: grab; }
+/* wire 模式下引脚和连接点用 crosshair */
+.canvas.tool-wire .pin, .canvas.tool-wire .junction, .canvas.tool-wire .remote-node { cursor: crosshair; }
+.canvas.tool-wire .component { cursor: default; }
+.canvas.tool-wire .wire { cursor: default; }
+/* blueprint 模式 */
+.canvas.tool-blueprint { cursor: crosshair; }
+.canvas.tool-blueprint .component, .canvas.tool-blueprint .wire, .canvas.tool-blueprint .junction { cursor: crosshair; }
+/* 其他放置类工具 */
+.canvas.tool-label, .canvas.tool-cross, .canvas.tool-junction, .canvas.tool-remote { cursor: crosshair; }
 .component .body { fill: #2d2d30; stroke: #75beff; stroke-width: 2; }
+.component .hitbox { fill: transparent; stroke: none; pointer-events: all; }
 .component .sym { fill: none; stroke: var(--gold); stroke-width: 2.2; }
 .component .line { fill: none; stroke: #9cdcfe; stroke-width: 2; }
 .component text { fill: #d4d4d4; font-size: 13px; pointer-events: none; }
 .component .ref { fill: #75beff; font-size: 12px; }
-.pin { fill: #1e1e1e; stroke: #4fc1ff; stroke-width: 2; cursor: crosshair; }
+.pin { fill: #1e1e1e; stroke: #4fc1ff; stroke-width: 2; }
+.pin.net { fill: #e5c07b; stroke: #fff; }
+/* select 模式下引脚仍然用 crosshair（绘制导线） */
+.canvas.tool-select .pin { cursor: crosshair; }
 .pin:hover { fill: #e5c07b; stroke: #fff; }
 .pintext { font-size: 11px !important; fill: #9cdcfe !important; }
 .labelbox { fill: #264f78; stroke: #75beff; stroke-width: 1.5; }
 .powertext { fill: #9cdcfe !important; font-weight: 700; }
-.junction { fill: #4fc1ff; stroke: #fff; stroke-width: 1.5; cursor: crosshair; }
+.junction { fill: #4fc1ff; stroke: #fff; stroke-width: 1.5; }
 .remote-node { fill: #1e1e1e; stroke: var(--purple); stroke-width: 2; cursor: crosshair; }
+/* select 模式下 remote-node 引脚仍然用 crosshair */
+.canvas.tool-select .remote-node { cursor: crosshair; }
 .remote-label { fill: var(--purple) !important; font-size: 12px !important; font-weight: 600; }
 .cross { stroke: var(--danger); stroke-width: 2.5; fill: none; }
 .bp-label { fill: var(--gold); font-size: 14px; font-weight: 600; }
-.canvas.blueprint-mode { cursor: crosshair; }
 .canvas.placing-mode { cursor: copy; }
+.preview-comp { opacity: 0.5; }
 
 /* ---------- Property panel ---------- */
 .property label { display: block; color: #b5b5b5; font-size: 12px; margin: 11px 0 3px; }
@@ -181,7 +203,12 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
   border-radius: 4px;
   padding: 15px;
 }
-.dialog h2 { margin: 0 0 10px; color: #75beff; font-size: 17px; }
+.dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.dialog-header h2 { margin: 0; color: #75beff; font-size: 17px; }
+.dialog-close {
+  border: 0; background: transparent; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px; border-radius: 3px;
+}
+.dialog-close:hover { background: #3e3e42; color: #fff; }
 .dialog textarea {
   width: 100%;
   height: 430px;
@@ -273,3 +300,19 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
   font-size: 13px;
 }
 .dir-tab.active { background: #252526; color: #75beff; border-color: #555; }
+
+/* ---------- Cursor 风格滚动条 ---------- */
+/* WebKit (Edge/Chrome) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  min-height: 30px;
+}
+::-webkit-scrollbar-thumb:hover { background: #4f4f4f; background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: #424242 transparent; }

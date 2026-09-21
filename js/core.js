@@ -18,7 +18,6 @@ const GRID = 20;
 /* ---------- 元件类型显示名 ---------- */
 const DEFS = {
   chip: '自定义芯片',
-  connector: '连接器',
   resistor: '电阻',
   capacitor: '电容',
   diode: '二极管',
@@ -49,11 +48,13 @@ let state,                    // 当前工程数据 {version, components, wires,
   clipboard = null,           // 剪贴板（内存，用于复制粘贴）
   zoom = 1,                   // 缩放比例
   pan = null,                 // 平移状态
+  mouseSvg = { x: 0, y: 0 },  // ★鼠标在画布坐标系中的位置（用于粘贴跟随鼠标）
   chipLibrary = [],           // 本机芯片库（localStorage 兜底缓存）
   uiMemory = {},              // UI 记忆（缩放、滚动等）
   currentFileName = '',       // ★当前正在编辑的文件名
   blueprintLibrary = [],     // ★蓝图库缓存
-  pendingBlueprint = null;    // ★正在放置的蓝图（从蓝图库选择后待放置到画布）
+  pendingBlueprint = null,   // ★正在放置的蓝图（从蓝图库选择后待放置到画布）
+  pendingComponent = null;   // ★正在悬浮放置的元件类型（从侧栏选择后跟随鼠标）
 
 /* ---------- 工具函数 ---------- */
 /** 创建 SVG 元素 */
@@ -112,6 +113,10 @@ function migrate(d) {
       c.name = String(c.name || 'REMOTE').trim() || 'REMOTE';
       c.pins = [{ side: 'left', name: 'NET' }];
     }
+    // ★ 确保每个元件有 rot 属性（0=0°, 1=90°, 2=180°, 3=270°）
+    if (c.rot == null) c.rot = 0;
+    // ★ 确保每个元件有 refOffset（位号文本相对于默认位置的偏移）
+    if (c.refOffset == null) c.refOffset = { x: 0, y: 0 };
   });
   d.wires = d.wires.map((w) => ({
     ...w,
@@ -130,15 +135,42 @@ function wh(c) {
     : { w: 70, h: 55 };
 }
 
-/** 计算元件某引脚在画布上的坐标 */
+/**
+ * 将本地坐标（元件坐标系）按旋转角度变换
+ * @param {number} lx 本地 X
+ * @param {number} ly 本地 Y
+ * @param {object} dims {w, h} 元件原始宽高
+ * @param {number} rot 0-3
+ * @returns {{x, y}} 变换后本地坐标
+ */
+function rotPoint(lx, ly, dims, rot) {
+  const { w, h } = dims;
+  if (rot === 0) return { x: lx, y: ly };
+  if (rot === 1) return { x: ly, y: w - lx };           // 90° CW
+  if (rot === 2) return { x: w - lx, y: h - ly };        // 180°
+  if (rot === 3) return { x: h - ly, y: lx };            // 270° CW
+  return { x: lx, y: ly };
+}
+
+/**
+ * 计算元件某引脚在画布上的坐标（考虑旋转）
+ */
 function pinPos(c, i) {
   const p = c.pins[i];
-  const { w, h } = wh(c);
-  if (p.side === 'top') return { x: c.x + w / 2, y: c.y };
-  if (p.side === 'bottom') return { x: c.x + w / 2, y: c.y + h };
-  const sameSide = c.pins.map((q, n) => (q.side === p.side ? n : null)).filter((n) => n !== null);
-  const o = sameSide.indexOf(i);
-  return { x: p.side === 'right' ? c.x + w : c.x, y: c.y + 32 + o * 22 };
+  const dims = wh(c);
+  const { w, h } = dims;
+  let lx, ly;
+  if (p.side === 'top') { lx = w / 2; ly = 0; }
+  else if (p.side === 'bottom') { lx = w / 2; ly = h; }
+  else {
+    const sameSide = c.pins.map((q, n) => (q.side === p.side ? n : null)).filter((n) => n !== null);
+    const o = sameSide.indexOf(i);
+    const lx0 = p.side === 'right' ? w : 0;
+    ly = 32 + o * 22;
+    lx = lx0;
+  }
+  const rp = rotPoint(lx, ly, dims, c.rot || 0);
+  return { x: c.x + rp.x, y: c.y + rp.y };
 }
 
 /** 生成端点的唯一键 */
@@ -360,6 +392,8 @@ Object.assign(PinSketch, {
   set zoom(v) { zoom = v; },
   get clipboard() { return clipboard; },
   set clipboard(v) { clipboard = v; },
+  get mouseSvg() { return mouseSvg; },
+  set mouseSvg(v) { mouseSvg = v; },
   get chipLibrary() { return chipLibrary; },
   set chipLibrary(v) { chipLibrary = v; },
   get currentFileName() { return currentFileName; },
@@ -368,9 +402,11 @@ Object.assign(PinSketch, {
   set blueprintLibrary(v) { blueprintLibrary = v; },
   get pendingBlueprint() { return pendingBlueprint; },
   set pendingBlueprint(v) { pendingBlueprint = v; },
+  get pendingComponent() { return pendingComponent; },
+  set pendingComponent(v) { pendingComponent = v; },
   // 函数
   el, snap, uid, byId, msg, esc, blank, migrate,
-  wh, pinPos, key, pos, client, rawClient, visibleCenter,
+  wh, pinPos, rotPoint, key, pos, client, rawClient, visibleCenter,
   graph, orth, route, path, activeNetwork, remoteMates,
   snapshot, commit, mark, isDirty, undo, redo, updateStatusbar,
   // DOM

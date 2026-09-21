@@ -22,15 +22,9 @@ async function finishBlueprintCapture(r) {
     msg('框选区域太小，蓝图未保存。');
     return;
   }
-  // 找到与框选矩形相交的元件
-  const ids = new Set(state.components.filter((c) => inside(c, r)).map((c) => c.id));
-  if (ids.size === 0) {
-    msg('框选区域内没有元件，蓝图未保存。');
-    return;
-  }
-  // 临时选中这些元件，以便 captureBlueprint 收集
-  selected = ids;
-  const bp = captureBlueprint(null);
+
+  // 直接从矩形区域捕获蓝图（包含 junction 连接点）
+  const bp = captureBlueprintFromRect(r, null);
   if (!bp) return;
 
   // 提示用户命名
@@ -43,7 +37,7 @@ async function finishBlueprintCapture(r) {
   }
   try {
     await saveBlueprint(name.trim(), bp);
-    msg('已保存蓝图"' + name.trim() + '"（' + bp.components.length + ' 个元件）');
+    msg('已保存蓝图"' + name.trim() + '"（' + bp.components.length + ' 个元件，' + bp.wires.length + ' 条导线）');
   } catch {
     msg('蓝图保存失败。');
   }

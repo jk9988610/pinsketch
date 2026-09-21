@@ -7,9 +7,10 @@
 /**
  * 检查项：
  * 1. 重复位号
- * 2. 悬空引脚
- * 3. 网络标签冲突
+ * 2. 悬空引脚（远程连接点除外）
+ * 3. 网络标签 / 远程连接点名称冲突
  * 4. 两端器件短接
+ * 5. 孤立远程连接点（同名只有一个，且未接到导线）
  * @returns {Array<{type:string, text:string, target:number}>}
  */
 function erc() {
@@ -23,7 +24,7 @@ function erc() {
   // 1. 重复位号
   const refs = {};
   state.components
-    .filter((c) => c.ref && c.type !== 'label' && c.type !== 'junction')
+    .filter((c) => c.ref && !['label', 'junction', 'remote'].includes(c.type))
     .forEach((c) => ((refs[c.ref] ||= []).push(c)));
   Object.entries(refs)
     .filter(([, a]) => a.length > 1)
@@ -32,24 +33,36 @@ function erc() {
   // 2. 悬空引脚
   const wk = new Set(state.wires.flatMap((w) => [key(w.a), key(w.b)]));
   all
-    .filter((x) => x.c.type !== 'label' && !wk.has('p' + x.c.id + '.' + x.i))
+    .filter((x) => !['label', 'remote'].includes(x.c.type) && !wk.has('p' + x.c.id + '.' + x.i))
     .forEach((x) =>
       issues.push({ type: 'warn', text: '悬空引脚：' + (x.c.ref || x.c.name) + '.' + x.p.name, target: x.c.id })
     );
 
-  // 3. 网络标签冲突
-  const labels = {};
+  // 3. 同一电气网络上出现不同名称的标签 / 远程点
+  const names = {};
   state.components
-    .filter((c) => c.type === 'label' && c.name.trim())
+    .filter((c) => ['label', 'remote'].includes(c.type) && c.name.trim())
     .forEach((c) => {
       const n = g.find('p' + c.id + '.0');
-      (labels[n] ||= new Set()).add(c.name.trim());
+      (names[n] ||= new Set()).add(c.name.trim());
     });
-  Object.entries(labels)
+  Object.entries(names)
     .filter(([, s]) => s.size > 1)
     .forEach(([n, s]) => {
       const x = all.find((x) => x.k === n);
-      issues.push({ type: 'error', text: '网络标签冲突：' + [...s].join(' / '), target: x?.c.id });
+      issues.push({ type: 'error', text: '网络名称冲突：' + [...s].join(' / '), target: x?.c.id });
+    });
+
+  // 5. 孤立远程连接点：名称唯一且没有导线
+  state.components
+    .filter((c) => c.type === 'remote' && c.name.trim())
+    .forEach((c) => {
+      const mates = remoteMates(c);
+      const wired = wk.has('p' + c.id + '.0');
+      if (!mates.length && !wired)
+        issues.push({ type: 'warn', text: '孤立远程连接点：' + c.name, target: c.id });
+      else if (!wired)
+        issues.push({ type: 'warn', text: '远程连接点未接到引脚：' + c.name, target: c.id });
     });
 
   // 4. 两端器件短接
@@ -80,13 +93,16 @@ function netlist() {
   let n = 1;
   let out = '# PinSketch 0.3 Netlist\n# Generated: ' + new Date().toLocaleString() + '\n\n';
   for (const a of Object.values(sets)) {
-    const labs = a
-      .filter((x) => x.c.type === 'label')
+    const named = a
+      .filter((x) => ['label', 'remote'].includes(x.c.type))
       .map((x) => x.c.name.trim())
       .filter(Boolean);
-    const name = labs[0] || 'NET_' + String(n++).padStart(3, '0');
-    out += 'NET ' + name + '\n';
-    a.filter((x) => x.c.type !== 'label').forEach(
+    const unique = [...new Set(named)];
+    const name = unique[0] || 'NET_' + String(n++).padStart(3, '0');
+    const members = a.filter((x) => !['label', 'remote'].includes(x.c.type));
+    if (!members.length && unique.length) continue; // 仅有命名端点、尚未接到器件
+    out += 'NET ' + name + (unique.length > 1 ? '  [' + unique.join(' / ') + ']' : '') + '\n';
+    members.forEach(
       (x) =>
         (out +=
           '  - ' +
@@ -98,6 +114,10 @@ function netlist() {
           (x.c.value ? ' [' + x.c.value + ']' : '') +
           '\n')
     );
+    const remotes = unique.filter((nm) =>
+      a.some((x) => x.c.type === 'remote' && x.c.name.trim() === nm)
+    );
+    if (remotes.length) out += '  - [REMOTE] ' + remotes.join(', ') + '\n';
     out += '\n';
   }
   return out;

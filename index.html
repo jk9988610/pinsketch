@@ -13,7 +13,6 @@
   <header class="top" id="titlebar">
     <div class="title-drag">
       <span class="logo">PinSketch <small>0.3</small></span>
-      <span class="title-subtitle">引脚—网络关系编辑器</span>
     </div>
     <div class="top-actions">
       <button id="newBtn">新建</button>
@@ -27,11 +26,9 @@
       <span class="tb-sep">|</span>
       <button id="libraryBtn">芯片库</button>
       <button id="blueprintBtn">蓝图库</button>
-      <button id="captureBpBtn">📐 框选蓝图</button>
       <span class="tb-sep">|</span>
       <button id="exportBtn">导出网表</button>
       <button id="checkBtn">ERC 检查</button>
-      <button id="alignBtn">对齐</button>
       <button id="zoomOutBtn">−</button>
       <button id="zoomResetBtn">100%</button>
       <button id="zoomInBtn">＋</button>
@@ -47,20 +44,13 @@
       <button class="tool active" data-tool="select">选择 / 移动 (V)</button>
       <button class="tool" data-tool="wire">正交导线 (W)</button>
       <button class="tool" data-tool="label">网络标签 (L)</button>
-      <button class="tool" data-tool="remote">远程连接点 (R)</button>
+      <button class="tool" data-tool="remote">远程连接点 (M)</button>
       <button class="tool" data-tool="junction">连接点 (J)</button>
       <button class="tool" data-tool="cross">打 × / NC</button>
       <button class="tool" data-tool="blueprint">📐 框选蓝图 (B)</button>
     </div>
     <h3>放置元件</h3>
     <div class="tools" id="parts"></div>
-    <div class="guide">
-      <b>0.3 规则</b><br>
-      导线只能连接蓝色引脚或青色连接点。点击空白处不会形成电气连接；请使用"连接点"显式连接导线。<br><br>
-      同名网络标签自动合并。选中引脚、标签或导线可高亮整网。<br><br>
-      导线采用正交走线；使用连接点可将多条导线并接。<br><br>
-      按 <b>B</b> 进入蓝图框选模式，拖动鼠标框选区域以保存为蓝图，可在蓝图库中重复放置。
-    </div>
   </aside>
 
   <!-- ==================== 中央画布 ==================== -->
@@ -78,7 +68,10 @@
 <!-- ==================== 模态框 ==================== -->
 <div class="modal" id="modal">
   <div class="dialog">
-    <h2 id="modalTitle"></h2>
+    <div class="dialog-header">
+      <h2 id="modalTitle"></h2>
+      <button class="dialog-close" id="modalCloseBtn" title="关闭">×</button>
+    </div>
     <div id="modalBody"></div>
     <div class="actions">
       <button id="copyBtn">复制</button>
