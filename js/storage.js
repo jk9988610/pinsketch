@@ -21,6 +21,7 @@ function initDB() {
       if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'name' });
       if (!db.objectStoreNames.contains('blueprints')) db.createObjectStore('blueprints', { keyPath: 'name' });
       if (!db.objectStoreNames.contains('chips')) db.createObjectStore('chips', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('parts')) db.createObjectStore('parts', { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -63,11 +64,13 @@ function loadAuto() {
 function loadMemory() {
   try {
     chipLibrary = JSON.parse(localStorage.getItem('pinsketch-chip-library') || '[]');
+    partsLibrary = JSON.parse(localStorage.getItem('pinsketch-parts-library') || '[]');
     blueprintLibrary = JSON.parse(localStorage.getItem('pinsketch-blueprint-library') || '[]');
     uiMemory = JSON.parse(localStorage.getItem('pinsketch-ui-memory') || '{}');
     currentFileName = localStorage.getItem('pinsketch-current-file') || '';
   } catch {
     chipLibrary = [];
+    partsLibrary = [];
     blueprintLibrary = [];
     uiMemory = {};
     currentFileName = '';
@@ -77,6 +80,7 @@ function loadMemory() {
 /** 保存芯片库、蓝图库缓存和 UI 记忆到 localStorage */
 function saveMemory() {
   localStorage.setItem('pinsketch-chip-library', JSON.stringify(chipLibrary));
+  localStorage.setItem('pinsketch-parts-library', JSON.stringify(partsLibrary));
   localStorage.setItem('pinsketch-blueprint-library', JSON.stringify(blueprintLibrary));
   localStorage.setItem('pinsketch-current-file', currentFileName);
   localStorage.setItem(
@@ -254,6 +258,32 @@ async function deleteChipFromDB(id) {
 }
 
 /* ============================================================
+   元件库 IndexedDB 同步
+   ============================================================ */
+
+/** 从 IndexedDB 加载元件库 */
+async function loadPartsLibraryFromDB() {
+  const all = await dbAction('parts', 'readonly', { type: 'getAll' });
+  if (all && all.length > 0) partsLibrary = all;
+}
+
+/** 保存元件到 IndexedDB */
+async function savePartToDB(part) {
+  await dbAction('parts', 'readwrite', { type: 'put', value: part });
+  const idx = partsLibrary.findIndex((c) => c.id === part.id);
+  if (idx >= 0) partsLibrary[idx] = part;
+  else partsLibrary.push(part);
+  saveMemory();
+}
+
+/** 从 IndexedDB 删除元件 */
+async function deletePartFromDB(id) {
+  await dbAction('parts', 'readwrite', { type: 'delete', key: id });
+  partsLibrary = partsLibrary.filter((c) => c.id !== id);
+  saveMemory();
+}
+
+/* ============================================================
    文件下载 / 打开外部文件
    ============================================================ */
 
@@ -313,5 +343,6 @@ Object.assign(PinSketch, {
   listFiles, saveFile, saveFileAs, loadFileByName, deleteFile, renameFile,
   listBlueprints, saveBlueprint, getBlueprint, deleteBlueprint, renameBlueprint,
   loadChipLibraryFromDB, saveChipToDB, deleteChipFromDB,
+  loadPartsLibraryFromDB, savePartToDB, deletePartFromDB,
   download, save, saveAs, loadFile,
 });

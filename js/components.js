@@ -125,8 +125,65 @@ function saveChipToLibrary(c) {
   };
   chipLibrary.push(item);
   saveMemory();
-  saveChipToDB(item).catch(() => {}); // 异步同步到 IndexedDB
+  saveChipToDB(item).catch(() => {});
   msg('已保存"' + item.name + '"到芯片库');
+}
+
+/* ---------- 元件库（基础元件） ---------- */
+function addPartFromLibrary(id) {
+  const t = partsLibrary.find((x) => x.id === id);
+  if (!t) return;
+  pendingComponent = { partTemplate: t };
+  tool = 'select';
+  setTool();
+  msg('元件跟随鼠标移动，左键点击放置，Esc 取消。');
+}
+
+function placePartFromLibrary(t, x, y) {
+  snapshot();
+  const n = state.components.filter((c) => c.type === t.type).length + 1;
+  const c = {
+    id: uid(),
+    type: t.type,
+    x: snap(x),
+    y: snap(y),
+    width: t.width ? Number(t.width) : undefined,
+    height: t.height ? Number(t.height) : undefined,
+    ref: refPrefix(t.type) + n,
+    name: t.name || DEFS[t.type] || t.type,
+    value: t.value || '',
+    pins: JSON.parse(JSON.stringify(t.pins || pins(t.type))),
+  };
+  state.components.push(c);
+  selected = new Set([c.id]);
+  selectedWire = null;
+  commit();
+  msg('已从元件库放置 ' + c.name);
+}
+
+function savePartToLibrary(c) {
+  if (!c) return;
+  const name = prompt('保存到元件库的名称：', c.name);
+  if (!name?.trim()) return;
+  const item = {
+    id: 'part-' + Date.now(),
+    type: c.type,
+    name: name.trim(),
+    value: c.value || '',
+    width: c.width,
+    height: c.height,
+    pins: JSON.parse(JSON.stringify(c.pins || [])),
+    createdAt: new Date().toISOString(),
+  };
+  partsLibrary.push(item);
+  saveMemory();
+  savePartToDB(item).catch(() => {});
+  msg('已保存"' + item.name + '"到元件库');
+}
+
+function refPrefix(type) {
+  const m = { chip: 'U', resistor: 'R', capacitor: 'C', diode: 'D', led: 'LED', button: 'SW', switch: 'SW', label: 'NET' };
+  return m[type] || '';
 }
 
 /* ---------- 解析引脚文本（多行 left:/right:） ---------- */
@@ -404,7 +461,8 @@ function placeBlueprint(bp, x, y) {
 
 /* ---------- 导出到全局命名空间 ---------- */
 Object.assign(PinSketch, {
-  pins, add, addFromLibrary, placeComponent, placeLibraryChip, saveChipToLibrary, parsePins,
+  pins, add, addFromLibrary, addPartFromLibrary, placeComponent, placeLibraryChip, placePartFromLibrary,
+  saveChipToLibrary, savePartToLibrary, parsePins,
   deleteSelected, rotateSelected,
   copySelection, paste, endpoint, selectComponent, normRect, inside,
   captureBlueprintFromRect, placeBlueprint,

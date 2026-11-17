@@ -64,7 +64,7 @@ body {
 
 /* ---------- Side panels ---------- */
 .left, .property { background: var(--panel); overflow: auto; padding: 11px; }
-.left { border-right: 1px solid var(--line); }
+.left { border-right: 1px solid var(--line); padding-top: 8px; }
 .property { border-left: 1px solid var(--line); }
 h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing: .6px; margin: 9px 0 7px; }
 
@@ -74,10 +74,57 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
 .guide, .note { font-size: 12px; line-height: 1.55; color: var(--muted); }
 .guide { margin-top: 15px; border-top: 1px solid #3e3e42; padding-top: 10px; }
 
+/* ---------- Dropdown menu ---------- */
+.dropdown { position: relative; display: inline-block; }
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 140px;
+  background: #252526;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px #0008;
+  z-index: 100;
+  padding: 4px;
+}
+.dropdown-menu.open { display: block; }
+.dropdown-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #ccc;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font: 13px inherit;
+}
+.dropdown-menu button:hover { background: #094771; color: #fff; }
+
+/* ---------- View controls (right panel) ---------- */
+.view-controls { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 10px; }
+.zoom-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.zoom-row button {
+  border: 1px solid #3e3e42;
+  background: #2d2d30;
+  color: var(--text);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.zoom-row button:hover { background: #3e3e42; }
+.zoom-row span { font-size: 12px; color: var(--text); min-width: 40px; text-align: center; }
+.coord-row { margin-top: 8px; }
+.coord-row span { font-size: 12px; color: var(--muted); font-family: Consolas, monospace; }
+
 /* ---------- Canvas / work area ---------- */
 .work {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
   background: #1e1e1e;
   user-select: none;
   -webkit-user-select: none;
@@ -121,10 +168,11 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
 .context-menu hr { border: 0; border-top: 1px solid #3e3e42; margin: 5px 0; }
 
 /* ---------- SVG elements ---------- */
-.wire { stroke: var(--wire); stroke-width: 3; fill: none; pointer-events: stroke; cursor: pointer; }
+.wire { stroke: #8cc08c; stroke-width: 3; fill: none; pointer-events: stroke; cursor: pointer; }
 .wire.preview { stroke: var(--gold); stroke-dasharray: 6 4; }
 .wire.net { stroke: #e5c07b; stroke-width: 5; }
 .wire.selected { stroke: #fff; stroke-width: 5; }
+.wire:hover { stroke: #4fc1ff; stroke-width: 4; }
 .selected { filter: drop-shadow(0 0 4px #e5c07b); }
 .component { cursor: default; }
 .component.net { filter: drop-shadow(0 0 5px #e5c07b); }
@@ -165,8 +213,11 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
 .remote-label { fill: var(--purple) !important; font-size: 12px !important; font-weight: 600; }
 .cross { stroke: var(--danger); stroke-width: 2.5; fill: none; }
 .bp-label { fill: var(--gold); font-size: 14px; font-weight: 600; }
-.canvas.placing-mode { cursor: copy; }
+.canvas.placing-mode { cursor: crosshair; }
 .preview-comp { opacity: 0.5; }
+/* 选中元件时元件线条变红 */
+.component.selected .line, .component.selected .sym, .component.selected .body { stroke: #ff4444; }
+.component.selected .cross { stroke: #ff4444; }
 
 /* ---------- Property panel ---------- */
 .property label { display: block; color: #b5b5b5; font-size: 12px; margin: 11px 0 3px; }
@@ -202,6 +253,10 @@ h3 { font-size: 12px; color: #75beff; text-transform: uppercase; letter-spacing:
   border: 1px solid #555;
   border-radius: 4px;
   padding: 15px;
+}
+.dialog.dialog-large {
+  width: min(1200px, 96vw);
+  max-height: 94vh;
 }
 .dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .dialog-header h2 { margin: 0; color: #75beff; font-size: 17px; }

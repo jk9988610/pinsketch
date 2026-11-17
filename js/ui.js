@@ -4,9 +4,11 @@
    ============================================================ */
 
 /* ---------- 模态框 ---------- */
-function modal(title, body, copy = '', file = '') {
+function modal(title, body, copy = '', file = '', large = false) {
   document.querySelector('#modalTitle').textContent = title;
   document.querySelector('#modalBody').innerHTML = body;
+  const dialog = document.querySelector('.dialog');
+  dialog.classList.toggle('dialog-large', large);
   document.querySelector('#modal').style.display = 'flex';
   document.querySelector('#copyBtn').style.display = copy ? '' : 'none';
   document.querySelector('#downloadBtn').style.display = file ? '' : 'none';
@@ -16,12 +18,14 @@ function modal(title, body, copy = '', file = '') {
 }
 
 /* ---------- 属性面板 ---------- */
+const propContent = document.querySelector('#propContent');
+
 function showProps() {
   const c = byId([...selected][0]);
 
   // 多选
   if (selected.size > 1) {
-    prop.innerHTML = `<h3>已选择 ${selected.size} 个元件</h3>
+    propContent.innerHTML = `<h3>已选择 ${selected.size} 个元件</h3>
       <p class="note">可拖动、复制、删除。按 Ctrl+C 复制，Ctrl+V 粘贴。按 R 旋转。</p>
       <div style="margin-top:8px;display:flex;gap:7px"><button id="rotate">旋转 R</button><button id="del">删除选中</button></div>`;
     document.querySelector('#del').onclick = deleteSelected;
@@ -32,8 +36,8 @@ function showProps() {
   // 导线选中
   if (selectedWire !== null) {
     const w = state.wires.find((x) => x.id === selectedWire);
-    prop.innerHTML =
-      '<h3>导线</h3><p class="note">双击导线可添加拐点；拖动黄色方块可调整拐点位置。</p><button id="del">删除导线</button>';
+    propContent.innerHTML =
+      '<h3>导线</h3><p class="note">双击导线可添加拐点；拖动黄色方块可调整拐点位置。按段拖动导线可移动该段。</p><button id="del">删除导线</button>';
     document.querySelector('#del').onclick = () => {
       snapshot();
       state.wires = state.wires.filter((x) => x.id !== selectedWire);
@@ -45,22 +49,22 @@ function showProps() {
 
   // 空白
   if (!c) {
-    prop.innerHTML =
-      '<div class="empty">拖曳画布空白处可框选。Shift+点击可增减选择。<br><br>选中导线后可拖动整条导线；双击导线新增拐点。<br><br>Ctrl+滚轮以鼠标为中心缩放，Shift+滚轮横向滚动，中键拖动平移画布。</div>';
+    propContent.innerHTML =
+      '<div class="empty">拖曳画布空白处可框选。Shift+点击可增减选择。<br><br>滚轮以鼠标位置缩放；中键拖动平移画布。<br><br>选中导线后可按段拖动；双击导线新增拐点。</div>';
     return;
   }
 
   // 连接点
   if (c.type === 'junction') {
-    prop.innerHTML =
-      '<h3>连接点</h3><p class="note">只有通过该点连接的导线才会形成电气网络。</p><button id="del">删除连接点</button>';
+    propContent.innerHTML =
+      '<h3>连接点</h3><p class="note">连接点不能独立移动，只能随导线拖动而移动。只有通过该点连接的导线才会形成电气网络。</p><button id="del">删除连接点</button>';
     document.querySelector('#del').onclick = deleteSelected;
     return;
   }
 
   // 打 × / NC
   if (c.type === 'cross') {
-    prop.innerHTML =
+    propContent.innerHTML =
       '<h3>× 标注</h3><p class="note">表示 NC、DNP 或不使用；不参与网络。</p><button id="del">删除</button>';
     document.querySelector('#del').onclick = deleteSelected;
     return;
@@ -72,7 +76,7 @@ function showProps() {
     const mateText = mates.length
       ? '已与 ' + mates.length + ' 个同名远程点隐藏连通：' + mates.map((x) => x.name).join(', ')
       : '当前还没有其他同名远程点。在另一处再放一个相同名称的远程点即可隐藏连接。';
-    prop.innerHTML = `<h3>远程连接点</h3>
+    propContent.innerHTML = `<h3>远程连接点</h3>
       <label>网络名称</label>
       <input id="remoteName" value="${esc(c.name)}">
       <p class="note">${esc(mateText)}<br><br>用法：用一小段导线把紫色端点接到芯片/按键引脚，再在另一张图同样命名。画布上不画跨区域长线，但 ERC 与网表会把两端视为同一网络。</p>
@@ -97,7 +101,7 @@ function showProps() {
     ? `<div class="row"><div><label>宽度</label><input id="width" type="number" min="100" step="10" value="${Number(c.width) || 180}"></div><div><label>高度</label><input id="height" type="number" min="80" step="10" value="${Number(c.height) || 140}"></div></div>`
     : '';
 
-  prop.innerHTML = `<h3>元件属性</h3>
+  propContent.innerHTML = `<h3>元件属性</h3>
     <label>类型</label>
     <input disabled value="${esc(DEFS[c.type] || c.type)}">
     <div class="row"><div><label>位号 / 标签</label><input id="ref" value="${esc(c.ref)}"></div><div><label>名称 / 型号</label><input id="name" value="${esc(c.name)}"></div></div>
@@ -105,7 +109,7 @@ function showProps() {
     <label>数值 / 备注</label>
     <input id="value" value="${esc(c.value)}">
     ${editable ? `<label>引脚定义</label><textarea id="pins">${esc(c.pins.map((p) => p.side + ': ' + p.name).join('\n'))}</textarea><p class="note">修改引脚会删除此器件的既有导线。</p>` : ''}
-    <div style="margin-top:12px;display:flex;gap:7px"><button id="apply">应用</button><button id="rotate">旋转 R</button>${editable ? '<button id="saveLib">保存到芯片库</button>' : ''}<button id="del">删除</button></div>`;
+    <div style="margin-top:12px;display:flex;gap:7px"><button id="apply">应用</button><button id="rotate">旋转 R</button>${c.type === 'chip' ? '<button id="saveLib">保存到芯片库</button>' : '<button id="savePart">保存到元件库</button>'}<button id="del">删除</button></div>`;
 
   document.querySelector('#apply').onclick = () => {
     snapshot();
@@ -128,23 +132,71 @@ function showProps() {
   };
   document.querySelector('#del').onclick = deleteSelected;
   document.querySelector('#rotate').onclick = rotateSelected;
-  if (editable)
+  if (c.type === 'chip')
     document.querySelector('#saveLib').onclick = () => saveChipToLibrary(c);
+  else {
+    const sp = document.querySelector('#savePart');
+    if (sp) sp.onclick = () => savePartToLibrary(c);
+  }
 }
 
 /* ---------- 芯片库 ---------- */
 function openLibrary() {
-  const body = chipLibrary.length
-    ? `<div class="note">单击"放置"将芯片添加到当前画布。</div>${chipLibrary
-        .map(
-          (x) => `<div class="issue"><b>${esc(x.name)}</b><br><span class="note">${x.pins.length} 个引脚　${esc(x.value || '')}</span><div style="margin-top:6px"><button data-place="${x.id}">放置</button> <button data-remove="${x.id}">删除</button></div></div>`
-        )
-        .join('')}`
-    : '<p class="note">芯片库为空。选中自定义芯片或连接器，在右侧点击"保存到芯片库"。</p>';
+  const body = `<div class="note">单击"放置"将芯片添加到当前画布。</div>
+    <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button id="addChipBtn" style="border:1px solid #007acc;background:#094771;color:#fff;padding:6px 12px;border-radius:3px;cursor:pointer">添加芯片</button>
+      <button id="exportChipsBtn" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:6px 12px;border-radius:3px;cursor:pointer">导出芯片库</button>
+      <button id="importChipsBtn" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:6px 12px;border-radius:3px;cursor:pointer">导入芯片库</button>
+    </div>
+    ${chipLibrary.length
+      ? chipLibrary
+          .map(
+            (x) => `<div class="issue"><b>${esc(x.name)}</b><br><span class="note">${x.pins.length} 个引脚　${esc(x.value || '')}</span><div style="margin-top:6px"><button data-place="${x.id}">放置</button> <button data-edit="${x.id}">编辑</button> <button data-remove="${x.id}">删除</button></div></div>`
+          )
+          .join('')
+      : '<p class="note">芯片库为空。</p>'}
+    <input id="chipImportFile" type="file" accept=".json" hidden>`;
   modal('芯片库', body);
+  document.querySelector('#addChipBtn').onclick = () => openChipDesigner();
+  // 导出
+  document.querySelector('#exportChipsBtn').onclick = () => {
+    const data = JSON.stringify(chipLibrary, null, 2);
+    download('pinsketch-chips.json', data, 'application/json');
+    msg('已导出芯片库');
+  };
+  // 导入
+  document.querySelector('#importChipsBtn').onclick = () => document.querySelector('#chipImportFile').click();
+  document.querySelector('#chipImportFile').onchange = (e) => {
+    if (!e.target.files[0]) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const imported = JSON.parse(r.result);
+        if (Array.isArray(imported)) {
+          for (const chip of imported) {
+            if (chip.name && chip.pins) {
+              chip.id = 'chip-' + Date.now() + Math.random();
+              chipLibrary.push(chip);
+              saveChipToDB(chip).catch(() => {});
+            }
+          }
+          saveMemory();
+          msg('已导入 ' + imported.length + ' 个芯片');
+          openLibrary();
+        }
+      } catch {
+        msg('导入失败：文件格式不正确');
+      }
+    };
+    r.readAsText(e.target.files[0]);
+  };
   document.querySelectorAll('[data-place]').forEach((b) => (b.onclick = () => {
     document.querySelector('#modal').style.display = 'none';
     addFromLibrary(b.dataset.place);
+  }));
+  document.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => {
+    const chip = chipLibrary.find((x) => x.id === b.dataset.edit);
+    if (chip) openChipEditor(chip);
   }));
   document.querySelectorAll('[data-remove]').forEach((b) => (b.onclick = () => {
     chipLibrary = chipLibrary.filter((x) => x.id !== b.dataset.remove);
@@ -152,6 +204,249 @@ function openLibrary() {
     deleteChipFromDB(b.dataset.remove).catch(() => {});
     openLibrary();
   }));
+}
+
+/* ---------- 元件库 ---------- */
+function openPartsLibrary() {
+  const builtin = Object.entries(DEFS)
+    .filter(([type]) => !['chip', 'label', 'remote', 'junction', 'cross'].includes(type))
+    .map(([type, name]) => ({ id: 'builtin-' + type, type, name, builtin: true }));
+
+  const body = `<div class="note">选择元件放置到画布。</div>
+    <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button id="addPartBtn" style="border:1px solid #007acc;background:#094771;color:#fff;padding:6px 12px;border-radius:3px;cursor:pointer">添加元件</button>
+      <button id="exportPartsBtn" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:6px 12px;border-radius:3px;cursor:pointer">导出元件库</button>
+      <button id="importPartsBtn" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:6px 12px;border-radius:3px;cursor:pointer">导入元件库</button>
+    </div>
+    <h3 style="margin:8px 0 4px">内置元件</h3>
+    ${builtin.map((p) => `<div class="issue"><b>${esc(p.name)}</b><div style="margin-top:6px"><button data-builtin="${p.type}">放置</button></div></div>`).join('')}
+    ${partsLibrary.length ? '<h3 style="margin:8px 0 4px">自定义元件</h3>' + partsLibrary.map((p) => `<div class="issue"><b>${esc(p.name)}</b> <span class="note">(${esc(DEFS[p.type] || p.type)})</span><div style="margin-top:6px"><button data-part-place="${p.id}">放置</button> <button data-part-edit="${p.id}">编辑</button> <button data-part-remove="${p.id}">删除</button></div></div>`).join('') : ''}
+    <input id="partImportFile" type="file" accept=".json" hidden>`;
+  modal('元件库', body);
+  document.querySelector('#addPartBtn').onclick = () => openPartDesigner();
+  // 导出
+  document.querySelector('#exportPartsBtn').onclick = () => {
+    const data = JSON.stringify(partsLibrary, null, 2);
+    download('pinsketch-parts.json', data, 'application/json');
+    msg('已导出元件库');
+  };
+  // 导入
+  document.querySelector('#importPartsBtn').onclick = () => document.querySelector('#partImportFile').click();
+  document.querySelector('#partImportFile').onchange = (e) => {
+    if (!e.target.files[0]) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const imported = JSON.parse(r.result);
+        if (Array.isArray(imported)) {
+          for (const part of imported) {
+            if (part.type && part.pins) {
+              part.id = 'part-' + Date.now() + Math.random();
+              partsLibrary.push(part);
+              savePartToDB(part).catch(() => {});
+            }
+          }
+          saveMemory();
+          msg('已导入 ' + imported.length + ' 个元件');
+          openPartsLibrary();
+        }
+      } catch {
+        msg('导入失败：文件格式不正确');
+      }
+    };
+    r.readAsText(e.target.files[0]);
+  };
+  document.querySelectorAll('[data-builtin]').forEach((b) => (b.onclick = () => {
+    document.querySelector('#modal').style.display = 'none';
+    add(b.dataset.builtin);
+  }));
+  document.querySelectorAll('[data-part-place]').forEach((b) => (b.onclick = () => {
+    document.querySelector('#modal').style.display = 'none';
+    addPartFromLibrary(b.dataset.partPlace);
+  }));
+  document.querySelectorAll('[data-part-edit]').forEach((b) => (b.onclick = () => {
+    const part = partsLibrary.find((x) => x.id === b.dataset.partEdit);
+    if (part) openPartEditor(part);
+  }));
+  document.querySelectorAll('[data-part-remove]').forEach((b) => (b.onclick = () => {
+    partsLibrary = partsLibrary.filter((x) => x.id !== b.dataset.partRemove);
+    saveMemory();
+    deletePartFromDB(b.dataset.partRemove).catch(() => {});
+    openPartsLibrary();
+  }));
+}
+
+/* ---------- 元件编辑器（编辑已有自定义元件） ---------- */
+function openPartEditor(part) {
+  openPartDesigner();
+  // 填充已有数据
+  document.querySelector('#pdType').value = part.type || 'resistor';
+  document.querySelector('#pdName').value = part.name || '';
+  document.querySelector('#pdValue').value = part.value || '';
+  document.querySelector('#pdPins').value = (part.pins || []).map((p) => p.side + ': ' + p.name).join('\n');
+  // 修改保存逻辑为更新
+  document.querySelector('#pdSave').onclick = () => {
+    part.type = document.querySelector('#pdType').value;
+    part.name = document.querySelector('#pdName').value.trim() || 'Custom';
+    part.value = document.querySelector('#pdValue').value.trim();
+    part.pins = document.querySelector('#pdPins').value.trim() ? parsePins(document.querySelector('#pdPins').value) : pins(part.type);
+    part.updatedAt = new Date().toISOString();
+    savePartToDB(part).catch(() => {});
+    saveMemory();
+    msg('元件"' + part.name + '"已更新');
+    openPartsLibrary();
+  };
+  document.querySelector('#pdPlace').onclick = () => {
+    document.querySelector('#pdSave').click();
+    document.querySelector('#modal').style.display = 'none';
+    addPartFromLibrary(part.id);
+  };
+}
+
+/* ---------- 芯片编辑器（编辑已有芯片） ---------- */
+function openChipEditor(chip) {
+  openChipDesigner();
+  // 填充已有数据
+  document.querySelector('#cdName').value = chip.name || '';
+  document.querySelector('#cdValue').value = chip.value || '';
+  document.querySelector('#cdWidth').value = chip.width || 180;
+  document.querySelector('#cdHeight').value = chip.height || 140;
+  document.querySelector('#cdPins').value = (chip.pins || []).map((p) => p.side + ': ' + p.name).join('\n');
+  // 修改保存逻辑为更新而非新建
+  document.querySelector('#cdSave').onclick = () => {
+    const name = document.querySelector('#cdName').value.trim() || 'Custom IC';
+    chip.name = name;
+    chip.value = document.querySelector('#cdValue').value.trim();
+    chip.width = Math.max(100, Number(document.querySelector('#cdWidth').value) || 180);
+    chip.height = Math.max(80, Number(document.querySelector('#cdHeight').value) || 140);
+    chip.pins = parsePins(document.querySelector('#cdPins').value);
+    chip.updatedAt = new Date().toISOString();
+    saveChipToDB(chip).catch(() => {});
+    saveMemory();
+    msg('芯片"' + name + '"已更新');
+    openLibrary();
+  };
+  document.querySelector('#cdPlace').onclick = () => {
+    document.querySelector('#cdSave').click();
+    document.querySelector('#modal').style.display = 'none';
+    addFromLibrary(chip.id);
+  };
+}
+
+/* ---------- 自定义芯片设计器 ---------- */
+function openChipDesigner() {
+  const body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">芯片名称</label>
+        <input id="cdName" value="Custom IC" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">位号前缀（如 U）</label>
+        <input id="cdRef" value="U" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">宽度</label>
+        <input id="cdWidth" type="number" value="180" min="100" step="10" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">高度</label>
+        <input id="cdHeight" type="number" value="140" min="80" step="10" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">数值/备注</label>
+        <input id="cdValue" value="" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+      </div>
+      <div>
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">引脚定义（每行一个，格式：方向:名称）</label>
+        <textarea id="cdPins" style="width:100%;height:200px;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:12px Consolas,sans-serif;resize:vertical">left: VCC
+left: GND
+left: SDA
+left: SCL
+right: INT
+right: TX
+right: RX
+right: EN</textarea>
+        <p class="note" style="margin:6px 0">方向可选：left, right, top, bottom</p>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:7px">
+      <button id="cdSave" style="border:1px solid #007acc;background:#094771;color:#fff;padding:7px 16px;border-radius:3px;cursor:pointer">保存到芯片库</button>
+      <button id="cdPlace" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:7px 16px;border-radius:3px;cursor:pointer">保存并放置</button>
+    </div>`;
+  modal('自定义芯片设计器', body);
+  document.querySelector('#cdSave').onclick = () => {
+    const name = document.querySelector('#cdName').value.trim() || 'Custom IC';
+    const item = {
+      id: 'chip-' + Date.now(),
+      name,
+      value: document.querySelector('#cdValue').value.trim(),
+      width: Math.max(100, Number(document.querySelector('#cdWidth').value) || 180),
+      height: Math.max(80, Number(document.querySelector('#cdHeight').value) || 140),
+      pins: parsePins(document.querySelector('#cdPins').value),
+      createdAt: new Date().toISOString(),
+    };
+    chipLibrary.push(item);
+    saveMemory();
+    saveChipToDB(item).catch(() => {});
+    msg('已保存"' + name + '"到芯片库');
+    openLibrary();
+  };
+  document.querySelector('#cdPlace').onclick = () => {
+    document.querySelector('#cdSave').click();
+    const item = chipLibrary[chipLibrary.length - 1];
+    if (item) {
+      document.querySelector('#modal').style.display = 'none';
+      addFromLibrary(item.id);
+    }
+  };
+}
+
+/* ---------- 自定义元件设计器 ---------- */
+function openPartDesigner() {
+  const partTypes = Object.entries(DEFS)
+    .filter(([type]) => !['chip', 'label', 'remote', 'junction', 'cross'].includes(type))
+    .map(([type, name]) => `<option value="${type}">${esc(name)}</option>`);
+  const body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">元件类型</label>
+        <select id="pdType" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">${partTypes.join('')}</select>
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">元件名称</label>
+        <input id="pdName" value="Custom" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">数值/备注</label>
+        <input id="pdValue" value="" style="width:100%;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:13px Consolas,sans-serif">
+      </div>
+      <div>
+        <label style="display:block;color:#b5b5b5;font-size:12px;margin:8px 0 3px">引脚定义（可选，格式：方向:名称）</label>
+        <textarea id="pdPins" style="width:100%;height:120px;background:#1e1e1e;border:1px solid #3e3e42;border-radius:3px;color:#d4d4d4;padding:6px;font:12px Consolas,sans-serif;resize:vertical" placeholder="left: 1
+right: 2"></textarea>
+        <p class="note" style="margin:6px 0">留空使用该类型默认引脚</p>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:7px">
+      <button id="pdSave" style="border:1px solid #007acc;background:#094771;color:#fff;padding:7px 16px;border-radius:3px;cursor:pointer">保存到元件库</button>
+      <button id="pdPlace" style="border:1px solid #3e3e42;background:#2d2d30;color:#d4d4d4;padding:7px 16px;border-radius:3px;cursor:pointer">保存并放置</button>
+    </div>`;
+  modal('自定义元件设计器', body);
+  document.querySelector('#pdSave').onclick = () => {
+    const type = document.querySelector('#pdType').value;
+    const name = document.querySelector('#pdName').value.trim() || 'Custom';
+    const pinsText = document.querySelector('#pdPins').value.trim();
+    const item = {
+      id: 'part-' + Date.now(),
+      type,
+      name,
+      value: document.querySelector('#pdValue').value.trim(),
+      pins: pinsText ? parsePins(pinsText) : pins(type),
+      createdAt: new Date().toISOString(),
+    };
+    partsLibrary.push(item);
+    saveMemory();
+    savePartToDB(item).catch(() => {});
+    msg('已保存"' + name + '"到元件库');
+    openPartsLibrary();
+  };
+  document.querySelector('#pdPlace').onclick = () => {
+    document.querySelector('#pdSave').click();
+    const item = partsLibrary[partsLibrary.length - 1];
+    if (item) {
+      document.querySelector('#modal').style.display = 'none';
+      addPartFromLibrary(item.id);
+    }
+  };
 }
 
 /* ---------- 右键菜单 ---------- */
@@ -178,6 +473,7 @@ function showMenu(e, items) {
       undo,
       redo,
       library: openLibrary,
+      partsLib: openPartsLibrary,
       blueprints: openBlueprintLibrary,
       files: openFileLibrary,
       saveAs,
@@ -185,10 +481,6 @@ function showMenu(e, items) {
         tool = 'wire';
         setTool();
         msg('导线工具：请选择起点');
-      },
-      junction: () => {
-        tool = 'junction';
-        setTool();
       },
       remote: () => {
         tool = 'remote';
@@ -333,11 +625,11 @@ function showHelp() {
       </ol>
       <h3>2. 左侧工具说明</h3>
       <ul>
-        <li><b>选择 / 移动（V）</b>：单击选择元件；<code>Shift + 单击</code> 增减多选；拖动元件移动；拖动画布空白区域可框选。多选后拖动可整体移动。</li>
+        <li><b>选择 / 移动</b>：默认模式。单击选择元件；<code>Shift + 单击</code> 增减多选；拖动元件移动；拖动画布空白区域可框选。点击位号或名称可拖动文本。</li>
         <li><b>正交导线（W）</b>：先点起点、再点终点。终点必须是蓝色引脚、青色连接点或紫色远程点。线条交叉默认不连通。选中导线后可直接拖动整条导线位移。</li>
         <li><b>网络标签（L）</b>：在画布空白处放置标签，右侧修改名称，如 <code>SDA</code>、<code>3V3</code>。同名标签自动代表同一网络。</li>
         <li><b>远程连接点（M）</b>：放置后填写网络名，如 <code>KEY_L</code>。把短线接到器件引脚；另一处同样命名即可隐藏连通，画布上不画长线。</li>
-        <li><b>连接点（J）</b>：在需要三路及以上汇接的位置放置。多条导线都接到同一个连接点，才形成电气并接。连接点可以像元件一样选中并拖动移动。</li>
+        <li><b>导线交汇</b>：导线交叉时默认不连通。连接点随导线拖动而移动，不能独立拖动。导线放置后为淡绿色，悬置时高亮。</li>
         <li><b>打 × / NC</b>：标注未使用、NC 或 DNP；它只用于说明，不参与网络连通。</li>
         <li><b>旋转（R）</b>：选中元件后按 <code>R</code> 键顺时针旋转 90°。可多次旋转。引脚位置和标签方向自动跟随旋转。</li>
       </ul>
@@ -365,7 +657,7 @@ function showHelp() {
       <ul>
         <li><b>复制粘贴</b>：<code>Ctrl/Cmd + C</code>、<code>Ctrl/Cmd + V</code>。复制元件和内部导线（两端都在选中集合内的导线）。粘贴时跟随鼠标位置放置。</li>
         <li><b>多选操作</b>：框选多个元件后可批量拖动、复制、删除。右侧属性面板提供删除选中按钮。</li>
-        <li><b>缩放和平移</b>：<code>Ctrl + 滚轮</code> 以鼠标位置为中心缩放；<code>Shift + 滚轮</code> 横向滚动；普通滚轮纵向滚动；中键拖动或 <code>Shift + 左键拖动</code> 平移画布。</li>
+        <li><b>缩放和平移</b>：滚轮以鼠标位置为中心缩放；中键拖动或 <code>Shift + 左键拖动</code> 平移画布。右侧面板也有缩放控件和鼠标坐标显示。</li>
         <li><b>导线操作</b>：单击导线选中后可直接拖动整条导线位移；双击导线增加拐点；选中后拖动黄色方块调整单个拐点位置。删除导线可重新布线。</li>
         <li><b>撤销与保存</b>：<code>Ctrl/Cmd + Z</code> 撤销，<code>Ctrl/Cmd + Y</code> 重做，<code>Ctrl/Cmd + S</code> 下载工程。浏览器同时会自动保存恢复副本。</li>
       </ul>
@@ -394,5 +686,7 @@ function showHelp() {
 
 /* ---------- 导出到全局命名空间 ---------- */
 Object.assign(PinSketch, {
-  modal, showProps, openLibrary, openFileLibrary, contextMenu, hideMenu, showMenu, showHelp,
+  modal, showProps, openLibrary, openPartsLibrary, openChipDesigner, openPartDesigner,
+  openChipEditor, openPartEditor,
+  openFileLibrary, contextMenu, hideMenu, showMenu, showHelp,
 });

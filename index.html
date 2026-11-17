@@ -15,23 +15,25 @@
       <span class="logo">PinSketch <small>0.3</small></span>
     </div>
     <div class="top-actions">
-      <button id="newBtn">新建</button>
+      <div class="dropdown">
+        <button id="fileMenuBtn">文件 ▾</button>
+        <div class="dropdown-menu" id="fileDropdown">
+          <button id="fileNewBtn">新建</button>
+          <button id="fileOpenBtn">打开…</button>
+          <button id="fileSaveBtn">保存</button>
+          <button id="fileSaveAsBtn">另存为…</button>
+        </div>
+      </div>
       <button id="undoBtn">↶ 撤销</button>
       <button id="redoBtn">↷ 重做</button>
       <span class="tb-sep">|</span>
-      <button id="saveBtn">保存</button>
-      <button id="saveAsBtn">另存为</button>
-      <button id="loadBtn">打开</button>
       <button id="fileBtn">文件库</button>
-      <span class="tb-sep">|</span>
       <button id="libraryBtn">芯片库</button>
+      <button id="partsLibBtn">元件库</button>
       <button id="blueprintBtn">蓝图库</button>
       <span class="tb-sep">|</span>
       <button id="exportBtn">导出网表</button>
       <button id="checkBtn">ERC 检查</button>
-      <button id="zoomOutBtn">−</button>
-      <button id="zoomResetBtn">100%</button>
-      <button id="zoomInBtn">＋</button>
       <button id="helpBtn">帮助</button>
       <span class="badge" id="dirty">已保存</span>
     </div>
@@ -39,18 +41,17 @@
 
   <!-- ==================== 左侧面板 ==================== -->
   <aside class="left">
-    <h3>编辑工具</h3>
+    <div class="tools" style="margin-bottom:8px">
+      <button id="snapBtn" class="tool active" title="网格吸附开关">吸附</button>
+    </div>
     <div class="tools">
-      <button class="tool active" data-tool="select">选择 / 移动 (V)</button>
-      <button class="tool" data-tool="wire">正交导线 (W)</button>
+      <button class="tool active" data-tool="wire">正交导线 (W)</button>
       <button class="tool" data-tool="label">网络标签 (L)</button>
       <button class="tool" data-tool="remote">远程连接点 (M)</button>
-      <button class="tool" data-tool="junction">连接点 (J)</button>
       <button class="tool" data-tool="cross">打 × / NC</button>
       <button class="tool" data-tool="blueprint">📐 框选蓝图 (B)</button>
     </div>
-    <h3>放置元件</h3>
-    <div class="tools" id="parts"></div>
+    <div class="tools" id="parts" style="margin-top:8px"></div>
   </aside>
 
   <!-- ==================== 中央画布 ==================== -->
@@ -59,7 +60,18 @@
   </main>
 
   <!-- ==================== 右侧属性面板 ==================== -->
-  <aside class="property" id="property"></aside>
+  <aside class="property" id="property">
+    <div class="view-controls" id="viewControls">
+      <h3>视图</h3>
+      <div class="zoom-row">
+        <span id="zoomDisplay">100%</span>
+      </div>
+      <div class="coord-row">
+        <span id="mouseCoord">X: 0  Y: 0</span>
+      </div>
+    </div>
+    <div id="propContent"></div>
+  </aside>
 
   <!-- ==================== 底部状态栏 ==================== -->
   <footer class="status" id="status">Ready · 自动保存已启用。</footer>

@@ -50,11 +50,14 @@ let state,                    // 当前工程数据 {version, components, wires,
   pan = null,                 // 平移状态
   mouseSvg = { x: 0, y: 0 },  // ★鼠标在画布坐标系中的位置（用于粘贴跟随鼠标）
   chipLibrary = [],           // 本机芯片库（localStorage 兜底缓存）
+  partsLibrary = [],          // ★元件库缓存
   uiMemory = {},              // UI 记忆（缩放、滚动等）
   currentFileName = '',       // ★当前正在编辑的文件名
   blueprintLibrary = [],     // ★蓝图库缓存
   pendingBlueprint = null,   // ★正在放置的蓝图（从蓝图库选择后待放置到画布）
-  pendingComponent = null;   // ★正在悬浮放置的元件类型（从侧栏选择后跟随鼠标）
+  pendingComponent = null,   // ★正在悬浮放置的元件类型（从侧栏选择后跟随鼠标）
+  selectedText = null,       // ★选中的文本（{cid, type:'ref'|'name'}）用于高亮+虚线
+  snapEnabled = true;        // ★吸附开关（网格线和交叉点）
 
 /* ---------- 工具函数 ---------- */
 /** 创建 SVG 元素 */
@@ -64,8 +67,8 @@ const el = (n, a = {}) => {
   return x;
 };
 
-/** 吸附到网格 */
-const snap = (n) => Math.round(n / GRID) * GRID;
+/** 吸附到网格（受 snapEnabled 开关控制） */
+const snap = (n) => snapEnabled ? Math.round(n / GRID) * GRID : Math.round(n);
 
 /** 生成唯一 ID */
 const uid = () => state.nextId++;
@@ -117,6 +120,8 @@ function migrate(d) {
     if (c.rot == null) c.rot = 0;
     // ★ 确保每个元件有 refOffset（位号文本相对于默认位置的偏移）
     if (c.refOffset == null) c.refOffset = { x: 0, y: 0 };
+    // ★ 确保每个元件有 nameOffset（名称/数值文本相对于默认位置的偏移）
+    if (c.nameOffset == null) c.nameOffset = { x: 0, y: 0 };
   });
   d.wires = d.wires.map((w) => ({
     ...w,
@@ -154,23 +159,33 @@ function rotPoint(lx, ly, dims, rot) {
 
 /**
  * 计算元件某引脚在画布上的坐标（考虑旋转）
+ * 用于导线路由等需要绝对坐标的场景
  */
 function pinPos(c, i) {
-  const p = c.pins[i];
-  const dims = wh(c);
-  const { w, h } = dims;
-  let lx, ly;
-  if (p.side === 'top') { lx = w / 2; ly = 0; }
-  else if (p.side === 'bottom') { lx = w / 2; ly = h; }
-  else {
-    const sameSide = c.pins.map((q, n) => (q.side === p.side ? n : null)).filter((n) => n !== null);
-    const o = sameSide.indexOf(i);
-    const lx0 = p.side === 'right' ? w : 0;
-    ly = 32 + o * 22;
-    lx = lx0;
-  }
-  const rp = rotPoint(lx, ly, dims, c.rot || 0);
+  const lp = pinLocal(c, i);
+  const rp = rotPoint(lp.x, lp.y, wh(c), c.rot || 0);
   return { x: c.x + rp.x, y: c.y + rp.y };
+}
+
+/**
+ * 计算元件某引脚在本地坐标系（旋转前）中的坐标
+ * 用于渲染——在旋转的 <g> 组内放置引脚圆点
+ */
+function pinLocal(c, i) {
+  const p = c.pins[i];
+  const { w, h } = wh(c);
+  if (p.side === 'top') return { x: w / 2, y: 0 };
+  if (p.side === 'bottom') return { x: w / 2, y: h };
+  const sameSide = c.pins.map((q, n) => (q.side === p.side ? n : null)).filter((n) => n !== null);
+  const o = sameSide.indexOf(i);
+  const lx0 = p.side === 'right' ? w : 0;
+  // 基础元件图形垂直中心在 y=28（70×55 框的中心偏上），引脚沿中心对称排列
+  if (w === 70) {
+    const count = sameSide.length;
+    const startY = 28 - (count - 1) * 11;
+    return { x: lx0, y: startY + o * 22 };
+  }
+  return { x: lx0, y: 32 + o * 22 };
 }
 
 /** 生成端点的唯一键 */
@@ -260,6 +275,16 @@ function orth(a, b) {
   if (a.x === b.x || a.y === b.y) return [a, b];
   const mid = snap((a.x + b.x) / 2);
   return [a, { x: mid, y: a.y }, { x: mid, y: b.y }, b];
+}
+
+/**
+ * 追踪导线路径：导线沿网格线移动，先水平后垂直
+ * 当鼠标不在同一行/列时，走 L 形路径
+ */
+function traceWire(a, b) {
+  if (a.x === b.x || a.y === b.y) return [a, b];
+  // 先水平后垂直（L 形）
+  return [a, { x: b.x, y: a.y }, b];
 }
 
 /** 计算导线路径点序列 */
@@ -396,6 +421,8 @@ Object.assign(PinSketch, {
   set mouseSvg(v) { mouseSvg = v; },
   get chipLibrary() { return chipLibrary; },
   set chipLibrary(v) { chipLibrary = v; },
+  get partsLibrary() { return partsLibrary; },
+  set partsLibrary(v) { partsLibrary = v; },
   get currentFileName() { return currentFileName; },
   set currentFileName(v) { currentFileName = v; },
   get blueprintLibrary() { return blueprintLibrary; },
@@ -404,10 +431,14 @@ Object.assign(PinSketch, {
   set pendingBlueprint(v) { pendingBlueprint = v; },
   get pendingComponent() { return pendingComponent; },
   set pendingComponent(v) { pendingComponent = v; },
+  get selectedText() { return selectedText; },
+  set selectedText(v) { selectedText = v; },
+  get snapEnabled() { return snapEnabled; },
+  set snapEnabled(v) { snapEnabled = v; },
   // 函数
   el, snap, uid, byId, msg, esc, blank, migrate,
-  wh, pinPos, rotPoint, key, pos, client, rawClient, visibleCenter,
-  graph, orth, route, path, activeNetwork, remoteMates,
+  wh, pinPos, pinLocal, rotPoint, key, pos, client, rawClient, visibleCenter,
+  graph, orth, traceWire, route, path, activeNetwork, remoteMates,
   snapshot, commit, mark, isDirty, undo, redo, updateStatusbar,
   // DOM
   svg, work, prop, status, titlebar,
